@@ -24,6 +24,10 @@ class QLearningAgent:
         self.discount_factor = discount_factor
 
 ######################################################################################################################################################################
+    def load_Q_table(self, Q_table):
+        self.Q = Q_table
+
+######################################################################################################################################################################
     def get_Q_value(self, state, action):
       # Questo metodo restituisce il valore Q per una determinata coppia stato-azione.
       # Chiavi del dizianario Q : stato, azione
@@ -83,16 +87,16 @@ class QLearningAgent:
         discount_factor=1.0
 
         agent = QLearningAgent(alpha, epsilon, discount_factor)
+        tris = Tris()
+        state = tris.board
 
-        state = Tris().board
-
-        available_moves = Tris().available_moves()
+        available_moves = tris.available_moves()
         print("available_moves=", available_moves)
         print("state=\n",state)
 
         # Per lavorare con una struttura dati dizionario
         # c'è bisogno che stato attuale della griglia sia hashable e non un 'numpy.ndarray'
-        boardHash = str(state.reshape(3 * 3))
+        boardHash = tris.GetBoardHash()
         print("boardHash=",boardHash)
 
         action = agent.choose_action(boardHash, available_moves)

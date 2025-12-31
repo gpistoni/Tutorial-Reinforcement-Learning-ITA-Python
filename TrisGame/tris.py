@@ -28,6 +28,11 @@ class Tris:
         self.game_over = False
         self.run =0
 
+    def GetBoardHash(self):
+        state = self.board
+        boardHash = str(state.reshape(3 * 3)) # Ricorda : c'è bisogno che stato attuale della griglia sia hashable e non un 'numpy.ndarray'
+        return boardHash
+
     def checkBoard(self, found, val, r, c):
         if ( not found):
             return False
@@ -165,7 +170,7 @@ class Tris:
     #####################################################################################################################
     def test():
         game = Tris()
-        game.current_player = game.players[0] # Imposta il giocatore corrente su X. Quindi sarà lui a far la prima mossa. Nota : game.players[0] == "X"
+        game.current_player = game.players[0]           # Imposta il giocatore corrente su X. Quindi sarà lui a far la prima mossa. Nota : game.players[0] == "X"
         game.print_board()
 
         while (not game.game_over) and (bool(game.available_moves())) :
@@ -201,14 +206,9 @@ class Tris:
     def test_rand(self):
         self.run += 1
         game = Tris()
-        game.current_player = game.players[0] # Imposta il giocatore corrente su X. Quindi sarà lui a far la prima mossa. Nota : game.players[0] == "X"
+        game.current_player = game.players[0]           # Imposta il giocatore corrente su X. Quindi sarà lui a far la prima mossa. Nota : game.players[0] == "X"
 
         while (not game.game_over) and (bool(game.available_moves())) :
-            # fin quando non ci sono vincitori : (not game.game_over) == True
-            # e
-            # fin quando non ci sono azioni possibli : (bool(game.available_moves())) == True
-            # Note : bool([]) == False
-            # stai nel loop ...
 
             #print("Azioni possibili, espresse in coordinate: " , game.available_moves()  )
             move = random.choice(game.available_moves())
@@ -227,18 +227,21 @@ class Tris:
 
 
 # Random game test
-if 0 and __name__ == '__main__':
+if  __name__ == '__main__':
 
     tris = Tris()
     winnerstat = { 'X': 0, 'O': 0, 'Pareggio': 0 }
+    run = 0
 
-    while True:
+    while run < 10000:
+        run += 1
         winner  = tris.test_rand()
         #conteggia le vittorie dei due giocatori
         if (winner == None): winner = 'Pareggio'
         winnerstat[winner] += 1
         print("Statistiche vittorie: ", winnerstat)
 
+    print("Overall ", winnerstat['X'] / run * 100, "% vittorie per X")
 
 
 

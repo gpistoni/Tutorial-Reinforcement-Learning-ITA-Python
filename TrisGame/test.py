@@ -19,8 +19,7 @@ def test_QLearningAgent_rnd(dq):
     for j in range(num_games):
             game.reset()
             game.current_player = random.choice(game.players)
-            state = game.board
-            stateHash = str(state.reshape(3 * 3))
+            stateHash = game.GetBoardHash()
 
             while (not game.game_over) and (bool(game.available_moves())) :
 
@@ -38,7 +37,8 @@ def test_QLearningAgent_rnd(dq):
                     move =  index_max_Qvalue[1]
 
                 game.make_move(move)
-                game.draw_board_image(0.1)
+                if j % 1000 == 0:
+                    game.draw_board_image(0.1)
 
             #print("Fine partita nr : ", j )
             #print("WINNER : ",  game.winner)
@@ -56,16 +56,13 @@ def test_QLearningAgent_rnd(dq):
 if __name__ == '__main__':
 
     with open('Tris_data_train.pkl', 'rb') as fp:
-        dq_in_file = pickle.load(fp)
+        dq = pickle.load(fp)
 
-    print(len(dq_in_file))
+    print(len(dq))
 
-    items = list(dq_in_file.items())
-    # salva items in un file csv per ispezione
+        # salva items in un file csv per ispezione
+    items = list(dq.items())
     df = pd.DataFrame(items, columns=['State-Action', 'Q-Value'])
     df.to_csv('Tris_data_train_inspect.csv', index=False)
     
-    print("sample keys:", items[:5])
-    #dp = dq_in_file
-
-    test_QLearningAgent_rnd(dq_in_file);
+    test_QLearningAgent_rnd(dq);
