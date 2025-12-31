@@ -12,8 +12,8 @@ class Tris:
         
      # Inizializza variabili del gioco1
     def __init__(self):
-        self.nrows = 10
-        self.ncols = 10
+        self.nrows = 3
+        self.ncols = 3
         self.nTris = 3
 
         self.players = ['X', 'O']   # Due giocatori contrassegnano una casella con X oppure O. Questo punto riguarda la parte grafica
@@ -23,10 +23,17 @@ class Tris:
     # Questo metodo reimposta la tastiera di gioco, il giocatore corrente, il vincitore e
     # lo stato di fine gioco ai loro valori iniziali.
     def reset(self):
-        self.board = np.zeros( (self.ncols + self.nTris , self.nrows + self.nTris ))
+        self.board = np.zeros( (self.ncols, self.nrows))
         self.winner = None
         self.game_over = False
         self.run =0
+
+    def checkBoard(self, found, val, r, c):
+        if ( not found):
+            return False
+        if (r<0) or (r>=self.nrows) or (c<0) or (c>=self.ncols):
+            return False                
+        return found and val == self.board[r][c]
 
 
     def available_moves(self):
@@ -70,19 +77,20 @@ class Tris:
                 if (val!=0):
                     found = True # controllo riga                   
                     for tr in range(self.nTris):  
-                        found = found and val == self.board[i+tr][j]
+                        found = self.checkBoard(found, val, i + tr , j)
                     if (not found):
                         found = True     # controllo colonna                   
                         for tc in range(self.nTris):  
-                            found = found and val == self.board[i][j+tc]
+                           found = self.checkBoard(found, val, i  , j + tc)
                         if (not found):
                             found = True  # controllo diagonale positiva                          
                             for tc in range(self.nTris):  
-                                found = found and val == self.board[i+tc][j+tc]
+                                found = self.checkBoard(found, val, i + tc  , j + tc)
                             if (not found):
                                 found = True     # controllo diagonale negativa                           
                                 for tc in range(self.nTris):
-                                    found = found and val == self.board[i+tc][j-(tc)]
+                                    found = self.checkBoard(found, val, i + tc  , j - tc)
+                                
 
                     if found:
                             #Se c'è un vincitore, imposta di conseguenza il vincitore e lo stato di game over.
@@ -218,7 +226,8 @@ class Tris:
         return game.winner
 
 
-if __name__ == '__main__':
+# Random game test
+if 0 and __name__ == '__main__':
 
     tris = Tris()
     winnerstat = { 'X': 0, 'O': 0, 'Pareggio': 0 }
