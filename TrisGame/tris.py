@@ -9,47 +9,39 @@ import matplotlib.pyplot as plt
 
 
 class Tris:
-
-    # Inizializza variabili del gioco
+        
+     # Inizializza variabili del gioco
     def __init__(self):
-
-        self.board = np.zeros((3, 3))
-        #  inizializza il contenuto della griglia (questo non sarà output grafico)
-        # [[0. 0. 0.]
-        #  [0. 0. 0.]
-        #  [0. 0. 0.]]
+        self.nrows = 3
+        self.ncols = 3
+        self.nTris = 3
 
         self.players = ['X', 'O']   # Due giocatori contrassegnano una casella con X oppure O. Questo punto riguarda la parte grafica
         self.current_player = None
-        self.winner = None
-        self.game_over = False
-
+        self.reset()                 # Chiama il metodo reset per inizializzare lo stato del gioco
 
     # Questo metodo reimposta la tastiera di gioco, il giocatore corrente, il vincitore e
     # lo stato di fine gioco ai loro valori iniziali.
     def reset(self):
-        self.board = np.zeros((3, 3))
+        self.board = np.zeros( (self.nrows + self.nTris , self.ncols + self.nTris ))
         self.winner = None
         self.game_over = False
 
 
     def available_moves(self):
         moves = []
-        for i in range(3):
-            for j in range(3):
+        for i in range(self.ncols):
+            for j in range(self.nrows):
                 if self.board[i][j] == 0:
                     moves.append((i, j))
-        # oppure in comprehension list :
-        # moves = [(i, j) for i in range(3) for j in range(3) if self.board[i][j] == 0]
 
-        return moves   # ritorna la lista dei possibli movimenti, cioè dove le caselle sono libere ed hanno valore 0
+        return moves                        # ritorna la lista dei possibli movimenti, cioè dove le caselle sono libere ed hanno valore 0
 
 
-    def make_move(self, move):
-                      # move è una tupla con le cooridnate della casella in cui vuole effettuata la mossa.
+    def make_move(self, move):              # move è una tupla con le cooridnate della casella in cui vuole effettuata la mossa.
 
         if self.board[move[0]][move[1]] != 0:
-            return False  # Se la casella è già occupata, restituisce False, indicando che la mossa non è valida
+            return False                        # Se la casella è già occupata, restituisce False, indicando che la mossa non è valida
 
         #Aggiorna il tabellone con il simbolo del giocatore attuale,
         #controlla se la mossa ha portato a una vittoria
@@ -71,19 +63,28 @@ class Tris:
 ####################################################################################################################################
     def check_winner(self):
         # Controllo riga
-        for i in range(3):
-            if self.board[i][0] == self.board[i][1] == self.board[i][2] != 0:
-                #Se c'è un vincitore, imposta di conseguenza
-                #il vincitore e
-                #lo stato di game over.
-                self.winner = self.players[int(self.board[i][0] - 1)]
-                self.game_over = True
-        # Controllo colonna
-        for j in range(3):
-            if self.board[0][j] == self.board[1][j] == self.board[2][j] != 0:
-                self.winner = self.players[int(self.board[0][j] - 1)]
-                self.game_over = True
-        # Controllo diagonali
+        for i in range(self.nrows):     
+            for j in range(self.ncols):
+                val = self.board[i][j]
+                if (val!=0):
+                    found = True
+                    # controllo riga
+                    for tr in range(self.nTris):  
+                        found = found and val == self.board[i+tr][j]
+                    if (not found):
+                        found = True
+                        # controllo colonna
+                        for tc in range(self.nTris):  
+                            found = found and val == self.board[i][j+tc]
+
+                    if found:
+                            #Se c'è un vincitore, imposta di conseguenza
+                            #il vincitore e
+                            #lo stato di game over.
+                            self.winner = self.players[int(val - 1)]
+                            self.game_over = True            
+
+        # Controllo diagonali positive e negative
         if self.board[0][0] == self.board[1][1] == self.board[2][2] != 0:
             self.winner = self.players[int(self.board[0][0] - 1)]
             self.game_over = True
@@ -109,10 +110,8 @@ class Tris:
                      font_path=None, font_size=20) -> Image.Image:
         
         cell = 100
-        nx = self.board.shape[0]
-        ny = self.board.shape[1]
-        sizeX = nx * cell
-        sizeY = ny * cell
+        sizeX = self.ncols * cell
+        sizeY = self.nrows * cell
 
         img = Image.new("RGB", (sizeX, sizeY), bg_color)
         draw = ImageDraw.Draw(img)
@@ -121,15 +120,15 @@ class Tris:
         except Exception:
             font = ImageFont.load_default()
 
-        for c in range(1, nx):
+        for c in range(1, self.ncols):
             x = int(round(c * cell))
             draw.line([(x,0),(x,sizeY)], fill=line_color, width=line_width)
-        for r in range(1, ny):
+        for r in range(1, self.nrows):
             y = int(round(r * cell))
             draw.line([(0,y),(sizeX,y)], fill=line_color, width=line_width)
 
-        for r in range(ny):
-            for c in range(nx):
+        for r in range(self.nrows):
+            for c in range(self.ncols):
                 val = self.board[r, c]
                 
                 font = ImageFont.truetype("arial.ttf", 50)  # o None per default
