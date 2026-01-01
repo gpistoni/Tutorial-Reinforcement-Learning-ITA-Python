@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+from tris import Tris
 
 Transition = collections.namedtuple('Transition', ('state','action','reward','next_state','done'))
 
@@ -13,7 +14,9 @@ def board_to_tensor(board, agent_mark=1):
     b = np.array(board).reshape(9)
     arr[b == agent_mark] = 1.0
     arr[(b != 0) & (b != agent_mark)] = -1.0
-    return torch.from_numpy(arr)
+    state = torch.from_numpy(arr)
+    return state
+
 ###############################################################################################################################################
 class QNetwork(nn.Module):
     def __init__(self, in_dim=9, out_dim=9, hidden=128):
@@ -27,6 +30,7 @@ class QNetwork(nn.Module):
         )
     def forward(self, x):
         return self.net(x)
+    
 ###############################################################################################################################################
 class ReplayBuffer:
     def __init__(self, capacity=20000):
@@ -38,6 +42,7 @@ class ReplayBuffer:
         return Transition(*zip(*batch))
     def __len__(self):
         return len(self.buffer)
+    
 ###############################################################################################################################################
 class DQNAgent:
     def __init__(self, device='cpu', lr=1e-3, gamma=0.99, batch_size=64, buffer_capacity=5000):
@@ -49,15 +54,15 @@ class DQNAgent:
         self.gamma = gamma
         self.batch_size = batch_size
         self.replay = ReplayBuffer(buffer_capacity)
-        self.epsilon = 1.0
-        self.eps_min = 0.05
-        self.eps_decay = 0.9995
+        self.explorationRate = 1.0                          # exploration rate, che controlla la probabilità di scegliere un'azione casuale invece dell'azione ottimale.
+        self.explorationRate_min = 0.05
+        self.explorationRate_decay = 0.9995
         self.update_target_steps = 500
         self.step_count = 0
         self.loss_fn = nn.MSELoss()
 
     def select_action(self, state_tensor, available_moves):
-        if random.random() < self.epsilon:
+        if random.random() < self.explorationRate:
             return random.choice(available_moves)
         with torch.no_grad():
             qvals = self.policy_net(state_tensor.to(self.device).unsqueeze(0)).cpu().numpy().ravel()
@@ -75,34 +80,46 @@ class DQNAgent:
     def optimize(self):
         if len(self.replay) < self.batch_size:
             return
+        
+        # Sample batch e prepara tensori
         batch = self.replay.sample(self.batch_size)
         states = torch.tensor(np.stack(batch.state)).to(self.device)
         actions = torch.tensor(batch.action, dtype=torch.long).unsqueeze(1).to(self.device)
         rewards = torch.tensor(batch.reward, dtype=torch.float32).unsqueeze(1).to(self.device)
         dones = torch.tensor(batch.done, dtype=torch.float32).unsqueeze(1).to(self.device)
-        next_states = None
-        if batch.next_state[0] is not None:
-            next_states = torch.tensor(np.stack(batch.next_state)).to(self.device)
 
+        # Calcola Q-value attuale
         q_values = self.policy_net(states).gather(1, actions)
-        with torch.no_grad():
-            if next_states is not None:
-                next_q = self.target_net(next_states).max(1)[0].unsqueeze(1)
-            else:
-                next_q = torch.zeros_like(q_values)
-            target = rewards + (1.0 - dones) * self.gamma * next_q
 
+        # Calcola target Q-value
+        with torch.no_grad():
+            # Filtra solo stati non-terminali per calcolo next_q
+            non_final_mask = torch.tensor([ns is not None for ns in batch.next_state], dtype=torch.bool).to(self.device)
+            non_final_next_states = torch.tensor(
+                np.stack([ns for ns in batch.next_state if ns is not None])
+            ).to(self.device)
+            
+            # Calcola max Q per stati non-terminali
+            next_q_all = torch.zeros(len(batch.state), 1, device=self.device)
+            if non_final_next_states.numel() > 0:
+                next_q_vals = self.target_net(non_final_next_states).max(1)[0]
+                next_q_all[non_final_mask] = next_q_vals.unsqueeze(1)
+            
+            target = rewards + (1.0 - dones) * self.gamma * next_q_all
+
+        # Ottimizzazione
         loss = self.loss_fn(q_values, target)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
+        # Update target network e decay epsilon
         self.step_count += 1
         if self.step_count % self.update_target_steps == 0:
             self.target_net.load_state_dict(self.policy_net.state_dict())
 
-        if self.epsilon > self.eps_min:
-            self.epsilon *= self.eps_decay
+        if self.explorationRate > self.explorationRate_min:
+            self.explorationRate *= self.explorationRate_decay
 
     def save(self, path):
         torch.save({'policy': self.policy_net.state_dict(),
@@ -115,69 +132,65 @@ class DQNAgent:
         self.target_net.load_state_dict(ckpt['target'])
         self.optimizer.load_state_dict(ckpt['optimizer'])
 
-# Training loop: integra con la classe Tris presente in TrisGame/tris.py
+
+###############################################################################################################################################
+def _play_agent_turn(game, agent, state):
+    """Esegui turno agente. Ritorna (action, reward, done, next_state)"""
+    avail = game.available_moves()
+    action = agent.select_action(state, avail)
+    
+    if not game.make_move(action):
+        action = random.choice(avail)
+        game.make_move(action)
+    
+    if game.winner == 'X':
+        return action, 1.0, True, None
+    elif game.winner == 'O':
+        return action, -1.0, True, None
+    elif not game.available_moves():
+        return action, 0.0, True, None
+    else:
+        return action, 0.0, False, board_to_tensor(game.board, agent_mark=1)
+
+def _play_opponent_turn(game, agent, state, action):
+    """Esegui turno avversario. Ritorna (reward, done, next_state)"""
+    opp_action = random.choice(game.available_moves())
+    game.make_move(opp_action)
+    
+    if game.winner == 'O':
+        return -1.0, True, None
+    elif not game.available_moves():
+        return 0.0, True, None
+    else:
+        return 0.0, False, board_to_tensor(game.board, agent_mark=1)
+
+###############################################################################################################################################
+# Training loop: integra con la classe Tris presente in tris.py
 def train_dqn(agent, num_episodes, opponent='random'):
-    from TrisGame.tris import Tris
-    for ep in range(1, num_episodes+1):
+    for ep in range(1, num_episodes + 1):
         game = Tris()
         game.reset()
         game.current_player = game.players[0]
         state = board_to_tensor(game.board, agent_mark=1)
-        done = False
 
-        while (not game.game_over) and (bool(game.available_moves())):
-            if game.current_player == game.players[0]:
-                avail = game.available_moves()
-                action = agent.select_action(state, avail)
-                if not game.make_move(action):
-                    action = random.choice(avail)
-                    game.make_move(action)
-
-                if game.winner == 'X':
-                    reward = 1.0
-                    done = True
-                    next_state = None
-                elif game.winner == 'O':
-                    reward = -1.0
-                    done = True
-                    next_state = None
-                elif not game.available_moves():
-                    reward = 0.0
-                    done = True
-                    next_state = None
-                else:
-                    reward = 0.0
-                    next_state = board_to_tensor(game.board, agent_mark=1)
-
-                agent.remember(state, action, reward, None if next_state is None else next_state, done)
-                state = next_state if next_state is not None else state
+        while (not game.game_over) and game.available_moves():
+            if game.current_player == game.players[0]:        # Turno agente        
+                action, reward, done, next_state = _play_agent_turn(game, agent, state)
+                agent.remember(state, action, reward, next_state, done)
                 agent.optimize()
                 if done:
                     break
-
-            else:
-                if opponent == 'random':
-                    opp_action = random.choice(game.available_moves())
-                else:
-                    opp_action = random.choice(game.available_moves())
-                game.make_move(opp_action)
-                if game.winner == 'O':
-                    agent.remember(state, action, -1.0, None, True)
-                    agent.optimize()
+                state = next_state
+            else:                                           # Turno avversario                
+                reward, done, next_state = _play_opponent_turn(game, agent, state, action)
+                agent.remember(state, action, reward, next_state, done)
+                agent.optimize()
+                if done:
                     break
-                elif not game.available_moves():
-                    agent.remember(state, action, 0.0, None, True)
-                    agent.optimize()
-                    break
-                else:
-                    state = board_to_tensor(game.board, agent_mark=1)
+                state = next_state
 
         if ep % 500 == 0:
-            print(f"Episode {ep}, epsilon {agent.epsilon:.3f}, buffer {len(agent.replay)}")
+            print(f"Episode {ep}, explorationRate {agent.explorationRate:.3f}, buffer {len(agent.replay)}")
             agent.save(f"dqn_tris_ep{ep}.pth")
 
-###############################################################################################################################################
-if __name__ == '__main__':
-    a = DQNAgent()
-    train_dqn(a, num_episodes=2000)
-    a.save('dqn_tris_final.pth')
+
