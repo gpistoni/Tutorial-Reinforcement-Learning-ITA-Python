@@ -17,7 +17,7 @@ class Tris:
         self.nTris = 3
 
         self.players = ['X', 'O']   # Due giocatori contrassegnano una casella con X oppure O. Questo punto riguarda la parte grafica
-        self.current_player = None
+        self.current_player = self.players[0]
         self.reset()                 # Chiama il metodo reset per inizializzare lo stato del gioco
 
     # Questo metodo reimposta la tastiera di gioco, il giocatore corrente, il vincitore e
