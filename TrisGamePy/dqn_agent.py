@@ -44,6 +44,12 @@ class ReplayBuffer:
         return len(self.buffer)
     
 ###############################################################################################################################################
+class Action:
+    def __init__(self, c, r)        
+        self.c = c 
+        self.r = r
+        
+###############################################################################################################################################
 class DQNAgent:
     def __init__(self, device='cpu', lr=1e-3, gamma=0.99, batch_size=64, buffer_capacity=5000):
         self.device = torch.device(device)
@@ -56,25 +62,28 @@ class DQNAgent:
         self.replay = ReplayBuffer(buffer_capacity)
         self.explorationRate = 1.0                          # exploration rate, che controlla la probabilità di scegliere un'azione casuale invece dell'azione ottimale.
         self.explorationRate_min = 0.05
-        self.explorationRate_decay = 0.9995
+        self.explorationRate_decay = 0.9999
         self.update_target_steps = 500
         self.step_count = 0
         self.loss_fn = nn.MSELoss()
 
-    def select_action(self, state_tensor, available_moves):
+    def select_action(self, state_tensor, available_moves) -> Action:
         if random.random() < self.explorationRate:
             return random.choice(available_moves)
         with torch.no_grad():
             qvals = self.policy_net(state_tensor.to(self.device).unsqueeze(0)).cpu().numpy().ravel()
         mask = np.full(9, -np.inf)
-        for (i,j) in available_moves:
-            idx = i*3 + j
+        move = {}
+        for (c,r) in available_moves:
+            idx = r*3 + c
+            move[idx] = Action(c,r)
             mask[idx] = qvals[idx]
         best_idx = int(np.argmax(mask))
-        return (best_idx // 3, best_idx % 3)
+        return move[best_idx]
+
 
     def remember(self, state, action, reward, next_state, done):
-        aidx = action[0]*3 + action[1]
+        aidx = action[1]*3 + action[0]
         self.replay.push(state.numpy(), aidx, reward, None if next_state is None else next_state.numpy(), done)
 
     def optimize(self):
@@ -170,7 +179,6 @@ def train_dqn(agent, num_episodes, opponent='random'):
     for ep in range(1, num_episodes + 1):
         game = Tris()
         game.reset()
-        game.current_player = game.players[0]
         state = board_to_tensor(game.board, agent_mark=1)
 
         while (not game.game_over) and game.available_moves():
@@ -191,6 +199,54 @@ def train_dqn(agent, num_episodes, opponent='random'):
 
         if ep % 500 == 0:
             print(f"Episode {ep}, explorationRate {agent.explorationRate:.3f}, buffer {len(agent.replay)}")
-            agent.save(f"dqn_tris_ep{ep}.pth")
+            #agent.save(f"dqn_tris_ep{ep}.pth")
 
+            wins, draws, losses = test_dqn(agent, 100)
+            # Calcola e stampa i risultati
+            total = wins + draws + losses
+            accuracy = (wins / total) * 100 if total > 0 else 0
+            print(f"  Vittorie:  {wins:3d} ({wins/total*100:5.1f}%)")
+            print(f"  Pareggi:   {draws:3d} ({draws/total*100:5.1f}%)")
+            print(f"  Sconfitte: {losses:3d} ({losses/total*100:5.1f}%)")
+            print(f"  ACCURATEZZA: {accuracy:.1f}%")
 
+###############################################################################################################################################
+def test_dqn(agent, num_games=100):
+    """
+    Test l'agente DQN contro un avversario random per num_games partite.
+    Ritorna il numero di vittorie, pareggi e sconfitte.
+    """
+    wins = 0
+    draws = 0
+    losses = 0
+
+    for game_idx in range(num_games):
+        game = Tris()
+        game.reset()
+        state = board_to_tensor(game.board, agent_mark=1)
+
+        while (not game.game_over) and (bool(game.available_moves())):
+            if agent and game.current_player == game.players[0]:      # Agent (X)
+                avail = game.available_moves()
+                action = agent.select_action(state, avail)
+                if not game.make_move(action):
+                    action = random.choice(avail)
+                    game.make_move(action)
+            else:  # Opponent (O) - random
+                opp_action = random.choice(game.available_moves())       # Player (O)
+                game.make_move(opp_action)
+
+            # Update state after opponent's move
+            if not game.game_over and bool(game.available_moves()):
+                state = board_to_tensor(game.board, agent_mark=1)
+
+        # Count result
+        if game.winner == 'X':
+            wins += 1
+        elif game.winner == 'O':
+            losses += 1
+        else:
+            draws += 1
+
+    print(f"Partite completate: {game_idx + 1}/{num_games}")
+    return wins, draws, losses

@@ -16,7 +16,6 @@ def test_agent(agent, num_games=100):
     for game_idx in range(num_games):
         game = Tris()
         game.reset()
-        game.current_player = random.choice(game.players)  # random chi inizia
         state = board_to_tensor(game.board, agent_mark=1)
 
         while (not game.game_over) and (bool(game.available_moves())):
@@ -42,9 +41,7 @@ def test_agent(agent, num_games=100):
         else:
             draws += 1
 
-        if (game_idx + 1) % 20 == 0:
-            print(f"  Partite completate: {game_idx + 1}/{num_games}")
-
+    print(f"  Partite completate: {game_idx + 1}/{num_games}")
     return wins, draws, losses
 
 ###############################################################################################################################################
@@ -57,7 +54,6 @@ if __name__ == '__main__':
     print("=" * 60)
 
     # Esegui il test su 100 partite
-    print("\nEsecuzione test su 100 partite...")
     print("-" * 60)
     wins0, draws0, losses0 = test_agent(None, num_games)
     print("-" * 60)
@@ -80,7 +76,6 @@ if __name__ == '__main__':
         exit(1)
 
     # Esegui il test su 100 partite
-    print("\nEsecuzione test su 100 partite...")
     print("-" * 60)
     wins, draws, losses = test_agent(agent, num_games)
     print("-" * 60)
