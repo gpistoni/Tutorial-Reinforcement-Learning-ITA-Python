@@ -7,6 +7,16 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import matplotlib.pyplot as plt
 
+###############################################################################################################################################
+class Action:
+    def __init__(self, c, r):      
+        self.c = c 
+        self.r = r
+
+    def getIdx(self, ncols):
+        return self.r * ncols + self.c
+
+###############################################################################################################################################
 class Tris:
         
      # Inizializza variabili del gioco1
@@ -40,24 +50,24 @@ class Tris:
         return found and val == self.board[c][r]
     
 ####################################################################################################################################
-    def available_moves(self):
-        moves = []
+    def available_actions(self) -> list:
+        actions = []
         for r in range(self.nrows):
             for c in range(self.ncols):
                 if self.board[c,r] == 0:
-                    moves.append((c, r))
+                    actions.append(Action(c,r))    # Aggiunge la mossa possibile alla lista delle mosse
 
-        return moves                        # ritorna la lista dei possibli movimenti, cioè dove le caselle sono libere ed hanno valore 0
+        return actions                          # ritorna la lista dei possibli movimenti, cioè dove le caselle sono libere ed hanno valore 0
     
 ####################################################################################################################################
-    def make_move(self, move):              # move è una tupla con le cooridnate della casella in cui vuole effettuata la mossa.
-        if self.board[move[0]][move[1]] != 0:
-            return False                        # Se la casella è già occupata, restituisce False, indicando che la mossa non è valida
+    def make_move_action(self, action):              # move è una tupla con le cooridnate della casella in cui vuole effettuata la mossa.
+        if self.board[action.c][action.r] != 0:
+            return False                            # Se la casella è già occupata, restituisce False, indicando che la mossa non è valida
 
         #Aggiorna il tabellone con il simbolo del giocatore attuale,
         #controlla se la mossa ha portato a una vittoria
         #passa al turno dell'altro giocatore.
-        self.board[move[0]][move[1]] = self.players.index(self.current_player) + 1
+        self.board[action.c][action.r] = self.players.index(self.current_player) + 1
         # Note:  self.players.index("X") = 0 mentre self.players.index("O") = 1
 
         self.check_winner()
@@ -195,27 +205,27 @@ class Tris:
         game = Tris()
         game.print_board()
 
-        while (not game.game_over) and (bool(game.available_moves())) :
+        while (not game.game_over) and (bool(game.available_actions())) :
             # fin quando non ci sono vincitori : (not game.game_over) == True
             # e
             # fin quando non ci sono azioni possibli : (bool(game.available_moves())) == True
             # Note : bool([]) == False
             # stai nel loop ...
-            print("Azioni possibili, espresse in coordinate: " , game.available_moves()  )
+            print("Azioni possibili, espresse in coordinate: " , game.available_actions()  )
 
             if game.current_player == game.players[0] :
-                move = input(f"{game.current_player} è il tuo turno. Inserisci riga e colonna (e.g. 0 0): ")
-                move = tuple(map(int, move.split()))
+                move_in = input(f"{game.current_player} è il tuo turno. Inserisci riga e colonna (e.g. 0 0): ")
+                action = Action(move_in.split()[0], move_in.split()[1])
                 # come lavora map()
-                while move not in game.available_moves():
-                    move = input("Mossa non valida, riprova: ")
-                    move = tuple(map(int, move.split()))
+                while action not in game.available_actions():
+                    move_in = input("Mossa non valida, riprova: ")
+                    action = Action(move_in.split()[0], move_in.split()[1])
             else:
-                move = random.choice(game.available_moves())
+                action = random.choice(game.available_actions())
 
-            print("Mossa scelta : " , move)
+            print("Mossa scelta : " , action)
 
-            game.make_move(move)            
+            game.make_move_action(action)            
 
 
         if game.winner:
@@ -228,11 +238,11 @@ class Tris:
         self.run += 1
         self.reset()
       
-        while (not self.game_over) and (bool(self.available_moves())) :
+        while (not self.game_over) and (bool(self.available_actions())) :
 
-            #print("Azioni possibili, espresse in coordinate: " , game.available_moves()  )
-            move = random.choice(self.available_moves())
-            self.make_move(move)
+            #print("Azioni possibili, espresse in coordinate: " , self.available_actions()  )
+            move = random.choice(self.available_actions())
+            self.make_move_action(move)
             
 
         if self.winner:

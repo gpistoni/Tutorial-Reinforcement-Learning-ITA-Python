@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-from tris import Tris
+from tris import Tris, Action
 
 Transition = collections.namedtuple('Transition', ('state','action','reward','next_state','done'))
 
@@ -33,25 +33,24 @@ class QNetwork(nn.Module):
     
 ###############################################################################################################################################
 class ReplayBuffer:
+
     def __init__(self, capacity=20000):
         self.buffer = collections.deque(maxlen=capacity)
+
     def push(self, *args):
         self.buffer.append(Transition(*args))
+
     def sample(self, batch_size):
         batch = random.sample(self.buffer, batch_size)
         return Transition(*zip(*batch))
+    
     def __len__(self):
         return len(self.buffer)
     
-###############################################################################################################################################
-class Action:
-    def __init__(self, c, r)        
-        self.c = c 
-        self.r = r
         
 ###############################################################################################################################################
 class DQNAgent:
-    def __init__(self, device='cpu', lr=1e-3, gamma=0.99, batch_size=64, buffer_capacity=5000):
+    def __init__(self, device='cpu', explorationRate = 0, lr=1e-3, gamma=0.99, batch_size=64, buffer_capacity=5000):
         self.device = torch.device(device)
         self.policy_net = QNetwork().to(self.device)
         self.target_net = QNetwork().to(self.device)
@@ -60,38 +59,38 @@ class DQNAgent:
         self.gamma = gamma
         self.batch_size = batch_size
         self.replay = ReplayBuffer(buffer_capacity)
-        self.explorationRate = 1.0                          # exploration rate, che controlla la probabilità di scegliere un'azione casuale invece dell'azione ottimale.
+        self.explorationRate = explorationRate                       # exploration rate, che controlla la probabilità di scegliere un'azione casuale invece dell'azione ottimale.
         self.explorationRate_min = 0.05
         self.explorationRate_decay = 0.9999
         self.update_target_steps = 500
         self.step_count = 0
         self.loss_fn = nn.MSELoss()
-
-    def select_action(self, state_tensor, available_moves) -> Action:
+#--------------------------------------------------------------------------------------------------------------------
+    def select_action(self, state_tensor, available_actions) -> Action:
         if random.random() < self.explorationRate:
-            return random.choice(available_moves)
+            return random.choice(available_actions)
         with torch.no_grad():
             qvals = self.policy_net(state_tensor.to(self.device).unsqueeze(0)).cpu().numpy().ravel()
         mask = np.full(9, -np.inf)
         move = {}
-        for (c,r) in available_moves:
-            idx = r*3 + c
-            move[idx] = Action(c,r)
+        for action in available_actions:
+            idx = action.getIdx( 3 )
+            move[idx] = action
             mask[idx] = qvals[idx]
         best_idx = int(np.argmax(mask))
         return move[best_idx]
-
-
+#--------------------------------------------------------------------------------------------------------------------
     def remember(self, state, action, reward, next_state, done):
-        aidx = action[1]*3 + action[0]
+        aidx = action.getIdx( 3 )
         self.replay.push(state.numpy(), aidx, reward, None if next_state is None else next_state.numpy(), done)
-
+#--------------------------------------------------------------------------------------------------------------------
     def optimize(self):
         if len(self.replay) < self.batch_size:
             return
         
         # Sample batch e prepara tensori
         batch = self.replay.sample(self.batch_size)
+
         states = torch.tensor(np.stack(batch.state)).to(self.device)
         actions = torch.tensor(batch.action, dtype=torch.long).unsqueeze(1).to(self.device)
         rewards = torch.tensor(batch.reward, dtype=torch.float32).unsqueeze(1).to(self.device)
@@ -125,16 +124,16 @@ class DQNAgent:
         # Update target network e decay epsilon
         self.step_count += 1
         if self.step_count % self.update_target_steps == 0:
-            self.target_net.load_state_dict(self.policy_net.state_dict())
+            self.target_net.load_state_dict(self.policy_net.state_dict())       # Aggiorna la rete target con i pesi della rete policy
 
         if self.explorationRate > self.explorationRate_min:
             self.explorationRate *= self.explorationRate_decay
-
+#--------------------------------------------------------------------------------------------------------------------
     def save(self, path):
         torch.save({'policy': self.policy_net.state_dict(),
                     'target': self.target_net.state_dict(),
                     'optimizer': self.optimizer.state_dict()}, path)
-
+#--------------------------------------------------------------------------------------------------------------------
     def load(self, path):
         ckpt = torch.load(path, map_location=self.device)
         self.policy_net.load_state_dict(ckpt['policy'])
@@ -144,54 +143,54 @@ class DQNAgent:
 
 ###############################################################################################################################################
 def _play_agent_turn(game, agent, state):
+
     """Esegui turno agente. Ritorna (action, reward, done, next_state)"""
-    avail = game.available_moves()
-    action = agent.select_action(state, avail)
+    avail_actions = game.available_actions()
+    action = agent.select_action(state, avail_actions)
     
-    if not game.make_move(action):
-        action = random.choice(avail)
-        game.make_move(action)
+    if not game.make_move_action(action):
+        print(f"Action not valid: {action}")
+        action = random.choice(avail_actions)
+        game.make_move_action(action)
     
-    if game.winner == 'X':
+    if game.winner == 'X':                  
         return action, 1.0, True, None
-    elif game.winner == 'O':
-        return action, -1.0, True, None
     elif not game.available_moves():
-        return action, 0.0, True, None
+        return action, 0.1, True, None
     else:
         return action, 0.0, False, board_to_tensor(game.board, agent_mark=1)
 
-def _play_opponent_turn(game, agent, state, action):
+def _play_opponent_turn(game, agent, state):
     """Esegui turno avversario. Ritorna (reward, done, next_state)"""
-    opp_action = random.choice(game.available_moves())
-    game.make_move(opp_action)
+    opp_action = random.choice(game.available_actions())
+    game.make_move_action(opp_action)
     
     if game.winner == 'O':
         return -1.0, True, None
     elif not game.available_moves():
-        return 0.0, True, None
+        return 0.1, True, None
     else:
         return 0.0, False, board_to_tensor(game.board, agent_mark=1)
 
 ###############################################################################################################################################
 # Training loop: integra con la classe Tris presente in tris.py
 def train_dqn(agent, num_episodes, opponent='random'):
+
     for ep in range(1, num_episodes + 1):
         game = Tris()
         game.reset()
         state = board_to_tensor(game.board, agent_mark=1)
 
-        while (not game.game_over) and game.available_moves():
-            if game.current_player == game.players[0]:        # Turno agente        
+        while (not game.game_over) and game.available_actions():
+            if game.current_player == game.players[0]:           # Turno agente        
                 action, reward, done, next_state = _play_agent_turn(game, agent, state)
                 agent.remember(state, action, reward, next_state, done)
                 agent.optimize()
                 if done:
                     break
                 state = next_state
-            else:                                           # Turno avversario                
-                reward, done, next_state = _play_opponent_turn(game, agent, state, action)
-                agent.remember(state, action, reward, next_state, done)
+            else:                                               # Turno avversario                
+                reward, done, next_state = _play_opponent_turn(game, agent, state)
                 agent.optimize()
                 if done:
                     break
@@ -225,19 +224,20 @@ def test_dqn(agent, num_games=100):
         game.reset()
         state = board_to_tensor(game.board, agent_mark=1)
 
-        while (not game.game_over) and (bool(game.available_moves())):
-            if agent and game.current_player == game.players[0]:      # Agent (X)
-                avail = game.available_moves()
+        while (not game.game_over) and (bool(game.available_actions())):
+            if agent and game.current_player == game.players[0]:           # Agent (X)
+                avail = game.available_actions()
                 action = agent.select_action(state, avail)
-                if not game.make_move(action):
+                if not game.make_move_action(action):
+                    print(f"Action not valid: {action}")  
                     action = random.choice(avail)
-                    game.make_move(action)
+                    game.make_move_action(action)
             else:  # Opponent (O) - random
-                opp_action = random.choice(game.available_moves())       # Player (O)
-                game.make_move(opp_action)
+                opp_action = random.choice(game.available_actions())       # Player (O)
+                game.make_move_action(opp_action)
 
             # Update state after opponent's move
-            if not game.game_over and bool(game.available_moves()):
+            if not game.game_over and bool(game.available_actions()):
                 state = board_to_tensor(game.board, agent_mark=1)
 
         # Count result
