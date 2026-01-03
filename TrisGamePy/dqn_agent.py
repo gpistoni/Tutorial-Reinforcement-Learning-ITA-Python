@@ -72,8 +72,8 @@ class DQNAgent:
         self.replay_temp = ReplayBuffer(100)
         #EXPLORATION
         self.explorationRate = explorationRate                       # exploration rate, che controlla la probabilità di scegliere un'azione casuale invece dell'azione ottimale.
-        self.explorationRate_min = 0.05
-        self.explorationRate_decay = 0.9995
+        self.explorationRate_min = 0.02
+        self.explorationRate_decay = 0.9997
         #TARGET NET UPDATE
         self.update_target_steps = 500
         self.step_count = 0
@@ -116,50 +116,6 @@ class DQNAgent:
             self.replay_temp.buffer.clear()
 
         
-#--------------------------------------------------------------------------------------------------------------------
-    def optimize_old(self):
-        if len(self.replay) < self.batch_size:
-            return
-        
-        # Sample batch e prepara tensori
-        batch = self.replay.sample(self.batch_size)
-
-        states = torch.tensor(np.stack(batch.state)).to(self.device)
-        actions = torch.tensor(batch.action, dtype=torch.long).unsqueeze(1).to(self.device)
-        rewards = torch.tensor(batch.reward, dtype=torch.float32).unsqueeze(1).to(self.device)
-        dones = torch.tensor(batch.done, dtype=torch.float32).unsqueeze(1).to(self.device)
-
-        # Calcola Q-value attuale
-        q_values = self.policy_net(states).gather(1, actions)
-
-        # Calcola target Q-value
-        with torch.no_grad():
-            # Filtra solo stati non-terminali per calcolo next_q
-            non_final_mask = torch.tensor([ns is not None for ns in batch.next_state], dtype=torch.bool).to(self.device)
-            non_final_next_states = torch.tensor(np.stack([ns for ns in batch.next_state if ns is not None])).to(self.device)
-            
-            # Calcola max Q per stati non-terminali
-            next_q_all = torch.zeros(len(batch.state), 1, device=self.device)
-            if non_final_next_states.numel() > 0:
-                next_q_vals = self.target_net(non_final_next_states).max(1)[0]
-                next_q_all[non_final_mask] = next_q_vals.unsqueeze(1)
-            
-            target = rewards + (1.0 - dones) * self.gamma * next_q_all
-
-        # Ottimizzazione
-        loss = self.loss_fn(q_values, target)
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-
-        # Update target network e decay epsilon
-        self.step_count += 1
-        if self.step_count % self.update_target_steps == 0:
-            self.target_net.load_state_dict(self.policy_net.state_dict())       # Aggiorna la rete target con i pesi della rete policy
-
-        if self.explorationRate > self.explorationRate_min:
-            self.explorationRate *= self.explorationRate_decay
-
 #--------------------------------------------------------------------------------------------------------------------
     def optimize(self):
         # Se non ci sono abbastanza transizioni nel replay buffer, esci subito
@@ -247,8 +203,8 @@ class DQNAgent:
 #--------------------------------------------------------------------------------------------------------------------
     def save(self, file):
         # Salva gli stati delle reti, dell'ottimizzatore e metadati utili per ripristinare l'allenamento
-        os.makedirs("models");
-        path = "models//" + file + self.game.nrows + "-" + self.game.ncols + ".pth"
+        os.makedirs("models", exist_ok=True)
+        path = f"models/{file}-{self.game.nrows}-{self.game.ncols}-{self.game.nTris}.pth"
         torch.save({
             'policy': self.policy_net.state_dict(),
             'target': self.target_net.state_dict(),
@@ -259,7 +215,7 @@ class DQNAgent:
 
 #--------------------------------------------------------------------------------------------------------------------
     def load(self, file):
-        path = "models//" + file + self.game.nrows + "-" + self.game.ncols + ".pth"
+        path = f"models/{file}-{self.game.nrows}-{self.game.ncols}-{self.game.ntris}.pth"
         ckpt = torch.load(path, map_location=self.device)
         self.policy_net.load_state_dict(ckpt['policy'])
         self.target_net.load_state_dict(ckpt['target'])
@@ -303,7 +259,6 @@ def train_dqn(agent, num_episodes, opponent='random'):
                     next_state = board_to_tensor(agent.game, agent_mark=1)
 
                 agent.remember(state, action, reward, next_state, agent.game.run, done)
-                state = next_state
                 agent.optimize()
                 if done:
                     break
@@ -318,10 +273,9 @@ def train_dqn(agent, num_episodes, opponent='random'):
                     reward = 0.1
                     done = True
 
-                agent.remember(state, action, reward, None, agent.game.run, done)
-                state = next_state
                 agent.optimize()
                 if done:
+                    agent.remember(state, action, reward, None, agent.game.run, done)
                     break
 
 #-----------------------------------------------------------------------------------------------------------

@@ -20,10 +20,10 @@ class Action:
 class Tris:
         
      # Inizializza variabili del gioco1
-    def __init__(self):
-        self.nrows = 4
-        self.ncols = 4
-        self.nTris = 4
+    def __init__(self, nrow, ncol, ntris):
+        self.nrows = nrow
+        self.ncols = ncol
+        self.nTris = ntris
 
         self.players = ['X', 'O']   # Due giocatori contrassegnano una casella con X oppure O. Questo punto riguarda la parte grafica
         self.run = 0
