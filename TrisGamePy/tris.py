@@ -27,17 +27,18 @@ class Tris:
 
         self.players = ['X', 'O']   # Due giocatori contrassegnano una casella con X oppure O. Questo punto riguarda la parte grafica
         self.run = 0
-        self.reset()                 # Chiama il metodo reset per inizializzare lo stato del gioco
+        self.re_init()                 # Chiama il metodo reset per inizializzare lo stato del gioco
 
     # Questo metodo reimposta la tastiera di gioco, il giocatore corrente, il vincitore e
     # lo stato di fine gioco ai loro valori iniziali.
-    def reset(self):
+    def re_init(self):
         self.board = np.zeros( (self.ncols, self.nrows))
         self.current_player = random.choice(self.players)       # Sceglie casualmente chi inizia
         self.winner = None
         self.game_over = False
-        self.init_board = False
+        self.board_image_valid = False
         self.imove = 0
+        self.run += 1
 
     def GetBoardHash(self):
         state = self.board
@@ -186,9 +187,9 @@ class Tris:
                      bg_color=(255,255,255), line_color=(0,0,0), text_color=(0,0,0),
                       font_size=20) -> Image.Image:
         
-        if not self.init_board:
+        if not self.board_image_valid:
             self.init_board_image(0.01)
-            self.init_board = True
+            self.board_image_valid = True
 
         cell = 20
         sizeX = self.ncols * cell
@@ -259,8 +260,7 @@ class Tris:
 
 #####################################################################################################################
     def test_rand(self):
-        self.run += 1
-        self.reset()
+        self.re_init()
       
         while (not self.game_over) and (bool(self.available_actions())) :
             action = random.choice(self.available_actions())
@@ -270,8 +270,7 @@ class Tris:
     
 #####################################################################################################################
     def test_calculate(self):
-        self.run += 1
-        self.reset()
+        self.re_init()
       
         while (not self.game_over) and (bool(self.available_actions())) :
 

@@ -59,7 +59,7 @@ class ReplayBuffer:
         
 ###############################################################################################################################################
 class DQNAgent:
-    def __init__(self, device, game, explorationRate, lr=1e-3, gamma=0.99, batch_size=64, buffer_capacity=5000):
+    def __init__(self, device, game, explorationRate, lr=1e-5, gamma=0.99, batch_size=64, buffer_capacity=5000):
         self.device = torch.device(device)
         self.game = game
         self.policy_net = QNetwork(in_dim=game.dim() , out_dim=game.dim() ).to(self.device)
@@ -72,7 +72,7 @@ class DQNAgent:
         self.replay_temp = ReplayBuffer(100)
         #EXPLORATION
         self.explorationRate = explorationRate                       # exploration rate, che controlla la probabilità di scegliere un'azione casuale invece dell'azione ottimale.
-        self.explorationRate_min = 0.02
+        self.explorationRate_min = 0.05
         self.explorationRate_decay = 0.9997
         #TARGET NET UPDATE
         self.update_target_steps = 500
@@ -215,7 +215,7 @@ class DQNAgent:
 
 #--------------------------------------------------------------------------------------------------------------------
     def load(self, file):
-        path = f"models/{file}-{self.game.nrows}-{self.game.ncols}-{self.game.ntris}.pth"
+        path = f"models/{file}-{self.game.nrows}-{self.game.ncols}-{self.game.nTris}.pth"
         ckpt = torch.load(path, map_location=self.device)
         self.policy_net.load_state_dict(ckpt['policy'])
         self.target_net.load_state_dict(ckpt['target'])
@@ -239,6 +239,7 @@ def train_dqn(agent, num_episodes, opponent='random'):
             state = board_to_tensor(agent.game, agent_mark=1)
             done = False
             next_state = None
+            reward = 0
             
             if agent.game.current_player == agent.game.players[0]:
 
@@ -248,11 +249,8 @@ def train_dqn(agent, num_episodes, opponent='random'):
                 if agent.game.winner == 'X':
                     reward = 1.0
                     done = True
-                elif agent.game.winner == 'O':
-                    reward = -1.0
-                    done = True
                 elif not agent.game.available_actions():
-                    reward = 0.1
+                    reward = 0.0                   
                     done = True
                 else:
                     reward = 0.0
@@ -270,8 +268,10 @@ def train_dqn(agent, num_episodes, opponent='random'):
                     reward = -1.0
                     done = True
                 elif not agent.game.available_actions():
-                    reward = 0.1
+                    reward = 0.0
                     done = True
+                else:
+                    reward = 0.0
 
                 agent.optimize()
                 if done:
@@ -282,7 +282,6 @@ def train_dqn(agent, num_episodes, opponent='random'):
         if ep % 500 == 0:
             print("")
             print(f"Episode {ep}, explorationRate {agent.explorationRate:.3f}, buffer {len(agent.replay)}")
-            #agent.save(f"dqn_tris_ep{ep}.pth")
 
             wins, draws, losses = test_dqn(agent, 100)
             # Calcola e stampa i risultati
@@ -308,7 +307,7 @@ def test_dqn(agent, num_games=100):
 
         while (not agent.game.game_over) and (bool(agent.game.available_actions())):
 
-            if agent and agent.game.current_player == agent.game.players[0]:           # Agent (X)
+            if agent.game.current_player == agent.game.players[0]:           # Agent (X)
                 avail = agent.game.available_actions()
                 state = board_to_tensor(agent.game, agent_mark=1)
                 action = agent.select_action(state, avail)
@@ -321,6 +320,43 @@ def test_dqn(agent, num_games=100):
         if agent.game.winner == 'X':
             wins += 1
         elif agent.game.winner == 'O':
+            losses += 1
+        else:
+            draws += 1
+
+    print(f"Partite completate: {game_idx + 1}/{num_games}")
+    return wins, draws, losses
+
+###############################################################################################################################################
+def test_match_dqn( agentX, agentO, num_games=100):
+    """
+    Test l'agente DQN contro un avversario random per num_games partite.
+    Ritorna il numero di vittorie, pareggi e sconfitte.
+    """
+    wins = 0
+    draws = 0
+    losses = 0
+
+    for game_idx in range(num_games):
+        agentX.game.re_init()                 #agentX.game == agentO.game 
+
+        while (not agentX.game.game_over) and (bool(agentX.game.available_actions())):
+
+            if agentX.game.current_player == agentX.game.players[0]:           # Agent (X)
+                avail = agentX.game.available_actions()
+                state = board_to_tensor(agentX.game, agent_mark=1)
+                action = agentX.select_action(state, avail)
+                agentX.game.make_move_action(action,10)
+            else:  # Opponent Agent (O) la board e' in agentX
+                avail = agentO.game.available_actions()
+                state = board_to_tensor(agentO.game, agent_mark=1)
+                action = agentO.select_action(state, avail)                     # << Uso agentO
+                agentO.game.make_move_action(action, 10)
+
+        # Count result agentX.game == agentO.game
+        if agentX.game.winner == 'X':
+            wins += 1
+        elif agentX.game.winner == 'O':
             losses += 1
         else:
             draws += 1
