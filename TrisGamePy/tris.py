@@ -12,18 +12,18 @@ class Action:
     def __init__(self, c, r):      
         self.c = c 
         self.r = r
-
-    def getIdx(self, ncols):
-        return self.r * ncols + self.c
+  
+    def str(self):
+        return f"({self.c}, {self.r})"
 
 ###############################################################################################################################################
 class Tris:
         
      # Inizializza variabili del gioco1
     def __init__(self):
-        self.nrows = 3
-        self.ncols = 3
-        self.nTris = 3
+        self.nrows = 4
+        self.ncols = 4
+        self.nTris = 4
 
         self.players = ['X', 'O']   # Due giocatori contrassegnano una casella con X oppure O. Questo punto riguarda la parte grafica
         self.run = 0
@@ -37,11 +37,18 @@ class Tris:
         self.winner = None
         self.game_over = False
         self.init_board = False
+        self.imove = 0
 
     def GetBoardHash(self):
         state = self.board
         boardHash = str(state.reshape(3 * 3)) # Ricorda : c'è bisogno che stato attuale della griglia sia hashable e non un 'numpy.ndarray'
         return boardHash
+    
+    def dim(self):
+        return self.ncols * self.nrows
+    
+    def getIdx(self, action):
+        return action.r * self.ncols + action.c
     
 ####################################################################################################################################
     def checkBoard(self, found, val, c, r):
@@ -60,7 +67,23 @@ class Tris:
         return actions                          # ritorna la lista dei possibli movimenti, cioè dove le caselle sono libere ed hanno valore 0
     
 ####################################################################################################################################
-    def make_move_action(self, action):              # move è una tupla con le cooridnate della casella in cui vuole effettuata la mossa.
+    def calculate_action(self, radom_ratio):   
+        available_actions = self.available_actions()
+
+        action = random.choice(available_actions)
+        
+        # Azione casuale
+        if random.random() < radom_ratio:           
+            return action
+        
+        # Azione prima mossa
+        if (self.imove==0):
+            action = Action(int(self.nrows/2),int(self.ncols/2))
+
+        return action
+
+####################################################################################################################################
+    def make_move_action(self, action: Action, step_board = 500 ) -> bool:          # action è una tupla con le cooridnate della casella in cui vuole effettuata la mossa.
         if self.board[action.c][action.r] != 0:
             return False                            # Se la casella è già occupata, restituisce False, indicando che la mossa non è valida
 
@@ -69,11 +92,12 @@ class Tris:
         #passa al turno dell'altro giocatore.
         self.board[action.c][action.r] = self.players.index(self.current_player) + 1
         # Note:  self.players.index("X") = 0 mentre self.players.index("O") = 1
-
+        
+        self.imove += 1
         self.check_winner()
         self.switch_player()
         
-        if self.run % 100 == 1:
+        if self.run % step_board == 1:
             #print("Mossa scelta : " , move)
             self.step_board_image(0.2)            
         return True
@@ -104,7 +128,7 @@ class Tris:
                             for td in range(self.nTris):  
                                 found = self.checkBoard(found, val, c + td  , r + td)
                             if (not found):
-                                found = True     # controllo diagonale negativa                           
+                                found = True # controllo diagonale negativa                           
                                 for td in range(self.nTris):
                                     found = self.checkBoard(found, val, c + td  , r - td)                                
 
@@ -200,7 +224,7 @@ class Tris:
         plt.imshow(self.img)
         plt.pause(delay)  # forza aggiornamento
     
-    #####################################################################################################################
+#####################################################################################################################
     def test():
         game = Tris()
         game.print_board()
@@ -208,12 +232,12 @@ class Tris:
         while (not game.game_over) and (bool(game.available_actions())) :
             # fin quando non ci sono vincitori : (not game.game_over) == True
             # e
-            # fin quando non ci sono azioni possibli : (bool(game.available_moves())) == True
+            # fin quando non ci sono azioni possibli : (bool(game.available_actions())) == True
             # Note : bool([]) == False
             # stai nel loop ...
             print("Azioni possibili, espresse in coordinate: " , game.available_actions()  )
 
-            if game.current_player == game.players[0] :
+            if game.current_player == game.players[0]:
                 move_in = input(f"{game.current_player} è il tuo turno. Inserisci riga e colonna (e.g. 0 0): ")
                 action = Action(move_in.split()[0], move_in.split()[1])
                 # come lavora map()
@@ -233,23 +257,32 @@ class Tris:
         else:
             print("Pareggio!")
 
-    #####################################################################################################################
+#####################################################################################################################
     def test_rand(self):
         self.run += 1
         self.reset()
       
         while (not self.game_over) and (bool(self.available_actions())) :
+            action = random.choice(self.available_actions())
+            self.make_move_action(action, 1e6)            
 
-            #print("Azioni possibili, espresse in coordinate: " , self.available_actions()  )
-            move = random.choice(self.available_actions())
-            self.make_move_action(move)
-            
+        return self.winner
+    
+#####################################################################################################################
+    def test_calculate(self):
+        self.run += 1
+        self.reset()
+      
+        while (not self.game_over) and (bool(self.available_actions())) :
 
-        if self.winner:
-            print(f"{self.winner} Vince!")
-        else:
-            print("Pareggio!")
-
+            if self.current_player == self.players[0]:
+                #print("Azioni possibili, espresse in coordinate: " , self.available_actions()  )
+                action = self.calculate_action(0.0)
+                self.make_move_action(action)
+            else:
+                action = random.choice(self.available_actions())
+                self.make_move_action(action)
+          
         return self.winner
 
 
@@ -260,13 +293,22 @@ if  __name__ == '__main__':
     winnerstat = { 'X': 0, 'O': 0, 'Pareggio': 0 }
     
     while tris.run < 1000:
+        winner  = tris.test_calculate()
+        #conteggia le vittorie dei due giocatori
+        if (winner == None): winner = 'Pareggio'
+        winnerstat[winner] += 1
+    print("Statistiche Calc: ", winnerstat)
+    
+    tris = Tris()
+    winnerstat = { 'X': 0, 'O': 0, 'Pareggio': 0 }
+
+    while tris.run < 1000:
         winner  = tris.test_rand()
         #conteggia le vittorie dei due giocatori
         if (winner == None): winner = 'Pareggio'
         winnerstat[winner] += 1
-        print("Statistiche Randomie: ", winnerstat)
+    print("Statistiche Rand: ", winnerstat)
 
-    print("Overall ", winnerstat['X'] / tris.run * 100, "% vittorie per X")
 
 
 

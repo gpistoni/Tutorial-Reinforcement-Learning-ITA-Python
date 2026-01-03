@@ -15,7 +15,8 @@ if __name__ == '__main__':
 
     # Esegui il test su 100 partite
     print("-" * 60)
-    wins0, draws0, losses0 = test_dqn(None, num_games)
+    agent = DQNAgent(device='cuda', game = Tris(), explorationRate = 1 )
+    wins0, draws0, losses0 = test_dqn(agent, num_games)
     print("-" * 60)
 
     print("=" * 60)
@@ -23,9 +24,9 @@ if __name__ == '__main__':
     print("=" * 60)
 
     # Carica l'agente e il modello salvato
-    agent = DQNAgent(device='cuda')
+    agent = DQNAgent(device='cuda', game = Tris(), explorationRate = 0 )
     try:
-        agent.load('dqn_tris_final.pth')
+        agent.load('dqn_game')
         print("✓ Modello 'dqn_tris_final.pth' caricato con successo")
     except FileNotFoundError:
         print("✗ Modello non trovato. Assicurati di aver eseguito 'run_train.py' prima.")

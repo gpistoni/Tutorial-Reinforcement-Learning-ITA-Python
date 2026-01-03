@@ -1,10 +1,11 @@
 from dqn_agent import DQNAgent, train_dqn
+from tris import Tris, Action
 
 ###############################################################################################################################################
 if __name__ == '__main__':
     num_episodes = 5000
 
-    agent = DQNAgent(device='cuda', explorationRate=1.0)
+    agent = DQNAgent(device='cuda', game=Tris(), explorationRate=1.0 )
     train_dqn(agent, num_episodes)
-    agent.save('dqn_tris_final.pth')
+    agent.save('dqn_game')
 
