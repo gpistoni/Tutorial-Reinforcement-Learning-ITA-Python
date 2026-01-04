@@ -66,12 +66,18 @@ class Tris:
                     actions.append(Action(c,r))    # Aggiunge la mossa possibile alla lista delle mosse
 
         return actions                          # ritorna la lista dei possibli movimenti, cioè dove le caselle sono libere ed hanno valore 0
-    
+
+####################################################################################################################################
+    def random_action(self):   
+        available_actions = self.available_actions()
+        action = random.choice(available_actions)
+        return action
+     
 ####################################################################################################################################
     def calculate_action(self, radom_ratio):   
         available_actions = self.available_actions()
 
-        action = random.choice(available_actions)
+        action = self.random_action()
         
         # Azione casuale
         if random.random() < radom_ratio:           
@@ -246,7 +252,7 @@ class Tris:
                     move_in = input("Mossa non valida, riprova: ")
                     action = Action(move_in.split()[0], move_in.split()[1])
             else:
-                action = random.choice(game.available_actions())
+                action = game.random_action()
 
             print("Mossa scelta : " , action)
 
@@ -263,7 +269,7 @@ class Tris:
         self.re_init()
       
         while (not self.game_over) and (bool(self.available_actions())) :
-            action = random.choice(self.available_actions())
+            action = self.random_action()
             self.make_move_action(action, 1e6)            
 
         return self.winner
@@ -279,7 +285,7 @@ class Tris:
                 action = self.calculate_action(0.0)
                 self.make_move_action(action)
             else:
-                action = random.choice(self.available_actions())
+                action = self.random_action()
                 self.make_move_action(action)
           
         return self.winner
@@ -288,7 +294,7 @@ class Tris:
 # Random game test
 if  __name__ == '__main__':
 
-    tris = Tris()
+    tris = Tris(3,3,3)
     winnerstat = { 'X': 0, 'O': 0, 'Pareggio': 0 }
     
     while tris.run < 1000:
@@ -298,7 +304,7 @@ if  __name__ == '__main__':
         winnerstat[winner] += 1
     print("Statistiche Calc: ", winnerstat)
     
-    tris = Tris()
+    tris = Tris(3,3,3)
     winnerstat = { 'X': 0, 'O': 0, 'Pareggio': 0 }
 
     while tris.run < 1000:

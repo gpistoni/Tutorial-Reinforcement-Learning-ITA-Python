@@ -16,15 +16,15 @@ if __name__ == '__main__':
     print("=" * 60)
 
     # Esegui il test su 100 partite
-    agentX = DQNAgent(device='cuda', game = game, explorationRate = 0 )
+    agentX = DQNAgent(device='cuda', game = game, explorationRate = 0.1 )
     agentX.load('dqn_game')
-    agentO = DQNAgent(device='cuda', game = game, explorationRate = 0 )
-    agentO.load('dqn_game_adv')
+    agentO = DQNAgent(device='cuda', game = game, explorationRate = 0.1 )
+    agentO.load('dqn_game')
     wins, draws, losses = test_match_dqn(agentX, agentO, num_games)
     print("-" * 60)
 
     print("\nRISULTATI MATCH:")
-    print(f"  Vittorie:  {wins:3d} ({wins/num_games*100:5.1f}%)")
+    print(f"  Vittorie X:  {wins:3d} ({wins/num_games*100:5.1f}%)")
     print(f"  Pareggi:   {draws:3d} ({draws/num_games*100:5.1f}%)")
     print(f"  Sconfitte: {losses:3d} ({losses/num_games*100:5.1f}%)")
     print("=" * 60)

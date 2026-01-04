@@ -59,7 +59,7 @@ class ReplayBuffer:
         
 ###############################################################################################################################################
 class DQNAgent:
-    def __init__(self, device, game, explorationRate, lr=1e-5, gamma=0.99, batch_size=64, buffer_capacity=5000):
+    def __init__(self, device, game, explorationRate, lr=1e-5, gamma=0.99, batch_size=128, buffer_capacity=10000):
         self.device = torch.device(device)
         self.game = game
         self.policy_net = QNetwork(in_dim=game.dim() , out_dim=game.dim() ).to(self.device)
@@ -82,7 +82,7 @@ class DQNAgent:
 #--------------------------------------------------------------------------------------------------------------------
     def select_action(self, state_tensor, available_actions) -> Action:
         if random.random() < self.explorationRate:
-            return random.choice(available_actions)
+            return self.game.random_action()
         with torch.no_grad():
             qvals = self.policy_net(state_tensor.to(self.device).unsqueeze(0)).cpu().numpy().ravel()
         max_qv = -1000
@@ -227,7 +227,7 @@ class DQNAgent:
 def train_dqn(agent, num_episodes, opponent='random'):
 
     for ep in range(1, num_episodes + 1):
-        agent.game.reset()
+        agent.game.re_init()
         state = board_to_tensor( agent.game, agent_mark=1)
 
         #stampa Prob prima mossa
@@ -272,10 +272,10 @@ def train_dqn(agent, num_episodes, opponent='random'):
                     done = True
                 else:
                     reward = 0.0
-
-                agent.optimize()
+                
                 if done:
                     agent.remember(state, action, reward, None, agent.game.run, done)
+                    agent.optimize()
                     break
 
 #-----------------------------------------------------------------------------------------------------------
@@ -283,7 +283,77 @@ def train_dqn(agent, num_episodes, opponent='random'):
             print("")
             print(f"Episode {ep}, explorationRate {agent.explorationRate:.3f}, buffer {len(agent.replay)}")
 
-            wins, draws, losses = test_dqn(agent, 100)
+            wins, draws, losses = test_dqn(agent, 1000)
+            # Calcola e stampa i risultati
+            total = wins + draws + losses
+            accuracy = (wins / total) * 100 if total > 0 else 0
+            print(f"  Vittorie:  {wins:3d} ({wins/total*100:5.1f}%)")
+            print(f"  Pareggi:   {draws:3d} ({draws/total*100:5.1f}%)")
+            print(f"  Sconfitte: {losses:3d} ({losses/total*100:5.1f}%)")
+            print("")
+
+###############################################################################################################################################
+# train di agnet con agente opponente agentO
+def train_dqn_agentO(agent, agentO, num_episodes, opponent='random'):
+
+    for ep in range(1, num_episodes + 1):
+        agent.game.re_init()
+        state = board_to_tensor( agent.game, agent_mark=1)
+
+        #stampa Prob prima mossa
+        agent.print_action_rprobs(state, agent.game.available_actions())
+
+#-----------------------------------------------------------------------------------------------------------
+        while (not agent.game.game_over) and (bool(agent.game.available_actions())):
+
+            state = board_to_tensor(agent.game, agent_mark=1)
+            done = False
+            next_state = None
+            reward = 0
+            
+            if agent.game.current_player == agent.game.players[0]:
+
+                action = agent.select_action(state, agent.game.available_actions())
+                agent.game.make_move_action(action)
+
+                if agent.game.winner == 'X':
+                    reward = 1.0
+                    done = True
+                elif not agent.game.available_actions():
+                    reward = 0.0                   
+                    done = True
+                else:
+                    reward = 0.0
+                    next_state = board_to_tensor(agent.game, agent_mark=1)
+
+                agent.remember(state, action, reward, next_state, agent.game.run, done)
+                agent.optimize()
+                if done:
+                    break
+
+            else:
+                opp_action = agentO.select_action(state, agent.game.available_actions() )
+                agent.game.make_move_action(opp_action)
+                if agent.game.winner == 'O':
+                    reward = -1.0
+                    done = True
+                elif not agent.game.available_actions():
+                    reward = 0.0
+                    done = True
+                else:
+                    reward = 0.0
+                
+                if done:
+                    agent.remember(state, action, reward, None, agent.game.run, done)
+                    agent.optimize()
+                    break
+
+#-----------------------------------------------------------------------------------------------------------
+        if ep % 500 == 0:
+            print("")
+            print(f"Episode {ep}, explorationRateX {agent.explorationRate:.3f}, buffer {len(agent.replay)}, explorationRateO {agentO.explorationRate:.3f}")
+
+            wins, draws, losses = test_dqn(agent, 1000)
             # Calcola e stampa i risultati
             total = wins + draws + losses
             accuracy = (wins / total) * 100 if total > 0 else 0
@@ -303,7 +373,7 @@ def test_dqn(agent, num_games=100):
     losses = 0
 
     for game_idx in range(num_games):
-        agent.game.reset()  
+        agent.game.re_init()  
 
         while (not agent.game.game_over) and (bool(agent.game.available_actions())):
 
@@ -313,7 +383,7 @@ def test_dqn(agent, num_games=100):
                 action = agent.select_action(state, avail)
                 agent.game.make_move_action(action)
             else:  # Opponent (O) - random
-                opp_action = random.choice(agent.game.available_actions())       # Player (O)
+                opp_action = agent.game.random_action()       # Player (O)
                 agent.game.make_move_action(opp_action)
 
         # Count result
@@ -346,12 +416,12 @@ def test_match_dqn( agentX, agentO, num_games=100):
                 avail = agentX.game.available_actions()
                 state = board_to_tensor(agentX.game, agent_mark=1)
                 action = agentX.select_action(state, avail)
-                agentX.game.make_move_action(action,10)
+                agentX.game.make_move_action(action,1000)
             else:  # Opponent Agent (O) la board e' in agentX
                 avail = agentO.game.available_actions()
                 state = board_to_tensor(agentO.game, agent_mark=1)
                 action = agentO.select_action(state, avail)                     # << Uso agentO
-                agentO.game.make_move_action(action, 10)
+                agentO.game.make_move_action(action, 1000)
 
         # Count result agentX.game == agentO.game
         if agentX.game.winner == 'X':
