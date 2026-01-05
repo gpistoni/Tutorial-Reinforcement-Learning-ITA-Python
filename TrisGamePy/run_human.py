@@ -1,26 +1,24 @@
 import random
 import torch
-from dqn_agent import DQNAgent, test_dqn, test_match_dqn
+from dqn_agent import DQNAgent, test_human_dqn
 from tris import Tris
 
 
 ###############################################################################################################################################
 if __name__ == '__main__':
 
-    num_games = 1000
+    num_games = 10
 
     game = Tris(3,3,3)
 
     print("=" * 60)
-    print("Test MATCH Agent - Tris")
+    print("Test HUMAN VS Agent - Tris")
     print("=" * 60)
 
     # Esegui il test su 100 partite
     agentX = DQNAgent(device='cuda', game = game, explorationRate = 0 )
     agentX.load('dqn_game_match')
-    agentO = DQNAgent(device='cuda', game = game, explorationRate = 0 )
-    agentO.load('dqn_game')
-    wins, draws, losses = test_match_dqn(agentX, agentO, num_games)
+    wins, draws, losses = test_human_dqn(agentX, num_games)
     print("-" * 60)
 
     print("\nRISULTATI MATCH:")

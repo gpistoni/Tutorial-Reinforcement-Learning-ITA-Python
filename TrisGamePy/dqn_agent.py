@@ -59,7 +59,7 @@ class ReplayBuffer:
         
 ###############################################################################################################################################
 class DQNAgent:
-    def __init__(self, device, game, explorationRate, lr=1e-5, gamma=0.99, batch_size=128, buffer_capacity=10000):
+    def __init__(self, device, game, explorationRate, lr=1e-4, gamma=0.99, batch_size=128, buffer_capacity=10000):
         self.device = torch.device(device)
         self.game = game
         self.policy_net = QNetwork(in_dim=game.dim() , out_dim=game.dim() ).to(self.device)
@@ -383,7 +383,7 @@ def test_dqn(agent, num_games=100):
                 action = agent.select_action(state, avail)
                 agent.game.make_move_action(action)
             else:  # Opponent (O) - random
-                opp_action = agent.game.random_action()       # Player (O)
+                opp_action = agent.game.random_action()                     # Player (O)
                 agent.game.make_move_action(opp_action)
 
         # Count result
@@ -407,21 +407,23 @@ def test_match_dqn( agentX, agentO, num_games=100):
     draws = 0
     losses = 0
 
+    game = agentX.game
+
     for game_idx in range(num_games):
-        agentX.game.re_init()                 #agentX.game == agentO.game 
+        game.re_init()                 #agentX.game == agentO.game 
 
-        while (not agentX.game.game_over) and (bool(agentX.game.available_actions())):
+        while (not game.game_over) and (bool(game.available_actions())):
 
-            if agentX.game.current_player == agentX.game.players[0]:           # Agent (X)
+            if agentX.game.current_player == game.players[0]:           # Agent (X)
                 avail = agentX.game.available_actions()
                 state = board_to_tensor(agentX.game, agent_mark=1)
                 action = agentX.select_action(state, avail)
-                agentX.game.make_move_action(action,1000)
+                game.make_move_action(action)
             else:  # Opponent Agent (O) la board e' in agentX
-                avail = agentO.game.available_actions()
+                avail = game.available_actions()
                 state = board_to_tensor(agentO.game, agent_mark=1)
-                action = agentO.select_action(state, avail)                     # << Uso agentO
-                agentO.game.make_move_action(action, 1000)
+                action = agentO.select_action(state, avail)              # << Uso agentO
+                game.make_move_action(action)
 
         # Count result agentX.game == agentO.game
         if agentX.game.winner == 'X':
@@ -433,3 +435,51 @@ def test_match_dqn( agentX, agentO, num_games=100):
 
     print(f"Partite completate: {game_idx + 1}/{num_games}")
     return wins, draws, losses
+
+###############################################################################################################################################
+def test_human_dqn( agentX, num_games):
+    """
+    Test l'agente DQN contro un avversario random per num_games partite.
+    Ritorna il numero di vittorie, pareggi e sconfitte.
+    """
+    wins = 0
+    draws = 0
+    losses = 0
+
+    game = agentX.game
+
+    for game_idx in range(num_games):
+        game.re_init()                 #agentX.game == agentO.game 
+
+        while (not game.game_over) and (bool(game.available_actions())):
+
+            if game.current_player == game.players[0]:           # Agent (X)
+                avail = game.available_actions()
+                state = board_to_tensor(game, agent_mark=1)
+                action = agentX.select_action(state, avail)
+                game.make_move_action(action)
+            else:  # Opponent Agent (O) la board e' in agentX
+                game.step_board_image(0.5)   
+                avail = game.available_actions()
+                move_in = input(f"{game.current_player} è il tuo turno. Inserisci riga e colonna (e.g. 0 0): ")
+                action = Action(int(move_in.split()[0]), int(move_in.split()[1]))
+                # come lavora map()
+                while not game.is_avalible(action):
+                    move_in = input("Mossa non valida, riprova: ")
+                    action = Action(int(move_in.split()[0]), int(move_in.split()[1]))
+                game.make_move_action(action)
+
+        # Count result agentX.game == agentO.game1
+        if agentX.game.winner == 'X':
+            wins += 1
+            print(f"X viince")
+        elif agentX.game.winner == 'O':
+            losses += 1
+            print(f"O viince")
+        else:
+            draws += 1
+            print(f"Pareggio")
+        print(f"Partite completate: {game_idx + 1}/{num_games}")
+
+    return wins, draws, losses
+

@@ -20,13 +20,14 @@ class Action:
 class Tris:
         
      # Inizializza variabili del gioco1
-    def __init__(self, nrow, ncol, ntris):
+    def __init__(self, nrow, ncol, ntris, show_freq = 500 ):
         self.nrows = nrow
         self.ncols = ncol
         self.nTris = ntris
 
         self.players = ['X', 'O']   # Due giocatori contrassegnano una casella con X oppure O. Questo punto riguarda la parte grafica
         self.run = 0
+        self.show_step_board_frequency = show_freq
         self.re_init()                 # Chiama il metodo reset per inizializzare lo stato del gioco
 
     # Questo metodo reimposta la tastiera di gioco, il giocatore corrente, il vincitore e
@@ -51,12 +52,24 @@ class Tris:
     def getIdx(self, action):
         return action.r * self.ncols + action.c
     
+
+    
+####################################################################################################################################
+    def is_selected(self, val, c, r):
+        if (r<0) or (r>=self.nrows) or (c<0) or (c>=self.ncols):
+            return False 
+        return bool(self.board[c][r] == val)
+    
 ####################################################################################################################################
     def checkBoard(self, found, val, c, r):
-        if (r<0) or (r>=self.nrows) or (c<0) or (c>=self.ncols):
-            return False                
-        return found and val == self.board[c][r]
+        return found and self.is_selected(val,c,r)
     
+####################################################################################################################################
+    def is_avalible(self, action):
+        if (action.r<0) or (action.r>=self.nrows) or (action.c<0) or (action.c>=self.ncols):
+            return False 
+        return self.board[action.c][action.r] == 0
+
 ####################################################################################################################################
     def available_actions(self) -> list:
         actions = []
@@ -86,11 +99,11 @@ class Tris:
         # Azione prima mossa
         if (self.imove==0):
             action = Action(int(self.nrows/2),int(self.ncols/2))
-
+ 
         return action
 
 ####################################################################################################################################
-    def make_move_action(self, action: Action, step_board = 500 ) -> bool:          # action è una tupla con le cooridnate della casella in cui vuole effettuata la mossa.
+    def make_move_action(self, action: Action ) -> bool:          # action è una tupla con le cooridnate della casella in cui vuole effettuata la mossa.
         if self.board[action.c][action.r] != 0:
             return False                            # Se la casella è già occupata, restituisce False, indicando che la mossa non è valida
 
@@ -104,7 +117,7 @@ class Tris:
         self.check_winner()
         self.switch_player()
         
-        if self.run % step_board == 1:
+        if self.run % self.show_step_board_frequency == 1:
             #print("Mossa scelta : " , move)
             self.step_board_image(0.2)            
         return True
@@ -255,7 +268,6 @@ class Tris:
                 action = game.random_action()
 
             print("Mossa scelta : " , action)
-
             game.make_move_action(action)            
 
 
@@ -264,13 +276,14 @@ class Tris:
         else:
             print("Pareggio!")
 
+
 #####################################################################################################################
     def test_rand(self):
         self.re_init()
       
         while (not self.game_over) and (bool(self.available_actions())) :
             action = self.random_action()
-            self.make_move_action(action, 1e6)            
+            self.make_move_action(action)            
 
         return self.winner
     
