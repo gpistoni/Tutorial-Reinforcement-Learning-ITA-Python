@@ -5,8 +5,8 @@ import numpy as np
 
 class DrivingGame:
     def __init__(self,
-                 map_w=1000, map_h=1000,
-                 screen_w=800, screen_h=600,
+                 map_w=1200, map_h=1200,
+                 screen_w=1000, screen_h=1000,
                  max_speed=4.0,
                  acc=0.2, brake=0.35, steer_angle=4.0,
                  fps=3000):
@@ -36,7 +36,7 @@ class DrivingGame:
 
         # Car properties
         self.car_w, self.car_h = 24, 12
-        self.start_pos = (500, 90.0)
+        self.start_pos = (500, 120.0)
         self.reset()
 
         # Pre-render car base image
@@ -107,20 +107,20 @@ class DrivingGame:
         rad = math.radians(self.car_angle)
         # Collision checks using a few sample points around the car
         self.state_points = [
-            (self.car_x + math.cos(rad-0.1) * 110, self.car_y + math.sin(rad-0.1) * 110),
-            (self.car_x + math.cos(rad+0.1) * 110, self.car_y + math.sin(rad+0.1) * 110),
+            (self.car_x + math.cos(rad-0.1) * 150, self.car_y + math.sin(rad-0.1) * 150),
+            (self.car_x + math.cos(rad+0.1) * 150, self.car_y + math.sin(rad+0.1) * 150),
             
-            (self.car_x + math.cos(rad-0.4) * 60, self.car_y + math.sin(rad-0.4) * 60),
-            (self.car_x + math.cos(rad-0.1) * 70, self.car_y + math.sin(rad-0.1) * 70),
-            (self.car_x + math.cos(rad+0.1) * 70, self.car_y + math.sin(rad+0.1) * 70),
-            (self.car_x + math.cos(rad+0.4) * 60, self.car_y + math.sin(rad+0.4) * 60),
+            (self.car_x + math.cos(rad-0.6) * 70, self.car_y + math.sin(rad-0.6) * 70),
+            (self.car_x + math.cos(rad-0.2) * 100, self.car_y + math.sin(rad-0.2) * 100),
+            (self.car_x + math.cos(rad+0.2) * 100, self.car_y + math.sin(rad+0.2) * 100),
+            (self.car_x + math.cos(rad+0.6) * 70, self.car_y + math.sin(rad+0.6) * 70),
 
-            (self.car_x + math.cos(rad-1.0) * 25, self.car_y + math.sin(rad-1.0) * 25),
-            (self.car_x + math.cos(rad-0.6) * 25, self.car_y + math.sin(rad-0.6) * 25),
-            (self.car_x + math.cos(rad-0.2) * 30, self.car_y + math.sin(rad-0.2) * 30),
-            (self.car_x + math.cos(rad+0.2) * 30, self.car_y + math.sin(rad+0.2) * 30),
-            (self.car_x + math.cos(rad+0.6) * 25, self.car_y + math.sin(rad+0.6) * 25),
-            (self.car_x + math.cos(rad+1.0) * 25, self.car_y + math.sin(rad+1.0) * 25),            
+            (self.car_x + math.cos(rad-1.0) * 40, self.car_y + math.sin(rad-1.0) * 40),
+            (self.car_x + math.cos(rad-0.6) * 40, self.car_y + math.sin(rad-0.6) * 40),
+            (self.car_x + math.cos(rad-0.2) * 50, self.car_y + math.sin(rad-0.2) * 50),
+            (self.car_x + math.cos(rad+0.2) * 50, self.car_y + math.sin(rad+0.2) * 50),
+            (self.car_x + math.cos(rad+0.6) * 40, self.car_y + math.sin(rad+0.6) * 40),
+            (self.car_x + math.cos(rad+1.0) * 40, self.car_y + math.sin(rad+1.0) * 40),            
         ]
 
         state.append(self.speed)
@@ -148,6 +148,7 @@ class DrivingGame:
         self.state_points = []
         self.reward = 0
 
+
 #-----------------------------------------------------------------------------------------------
     def rotate_center(self, image, angle):
         return pygame.transform.rotozoom(image, -angle, 1.0)
@@ -161,7 +162,6 @@ class DrivingGame:
 
 #-----------------------------------------------------------------------------------------------
     def step(self):
-        self.step +=1
         dt = self.clock.tick(self.FPS) / 1000.0
 
         for event in pygame.event.get():
@@ -227,53 +227,56 @@ class DrivingGame:
         cam_x = max(0, min(self.MAP_W - self.SCREEN_W, cam_x))
         cam_y = max(0, min(self.MAP_H - self.SCREEN_H, cam_y))
 
-        # Draw map region
-        self.screen.blit(self.map_surf, (0, 0), area=pygame.Rect(cam_x, cam_y, self.SCREEN_W, self.SCREEN_H))
+        if(self.step_count%4==0):
+            # Draw map region
+            self.screen.blit(self.map_surf, (0, 0), area=pygame.Rect(cam_x, cam_y, self.SCREEN_W, self.SCREEN_H))
 
-        # Draw rotated car
-        car_img = self.rotate_center(self.base_car, self.car_angle)
-        car_rect = car_img.get_rect(center=(int(self.car_x - cam_x), int(self.car_y - cam_y)))
-        self.screen.blit(car_img, car_rect)        
+            # Draw rotated car
+            car_img = self.rotate_center(self.base_car, self.car_angle)
+            car_rect = car_img.get_rect(center=(int(self.car_x - cam_x), int(self.car_y - cam_y)))
+            self.screen.blit(car_img, car_rect)        
 
-        #  STATE_PT Converti alle coord relative alla camera e disegna solo 3 punti (es. i primi 3)
-        for px, py in self.state_points:
-            screen_x = int(px - cam_x)
-            screen_y = int(py - cam_y)
-            if self.is_on_road(px, py):
-                col = (128, 128, 128)
-            else:
-                col = (255, 128, 128)
-            pygame.draw.circle(self.screen, col, (screen_x, screen_y), 4)  # rosso, raggio 4
+            #  STATE_PT Converti alle coord relative alla camera e disegna solo 3 punti (es. i primi 3)
+            for px, py in self.state_points:
+                screen_x = int(px - cam_x)
+                screen_y = int(py - cam_y)
+                if self.is_on_road(px, py):
+                    col = (128, 128, 128)
+                else:
+                    col = (255, 128, 128)
+                pygame.draw.circle(self.screen, col, (screen_x, screen_y), 4)  # rosso, raggio 4
 
-        # opzionale: disegna etichette dei punti
-        font = pygame.font.get_default_font()
-        f = pygame.font.Font(font, 14)
-        for i, (px, py) in enumerate(self.state_points):
-            sx, sy = int(px - cam_x), int(py - cam_y)
-            lbl = f.render(str(i), True, (128, 128, 128) )
-            self.screen.blit(lbl, (sx+6, sy-6))
+            # opzionale: disegna etichette dei punti
+            font = pygame.font.get_default_font()
+            f = pygame.font.Font(font, 14)
+            for i, (px, py) in enumerate(self.state_points):
+                sx, sy = int(px - cam_x), int(py - cam_y)
+                lbl = f.render(str(i), True, (128, 128, 128) )
+                self.screen.blit(lbl, (sx+6, sy-6))
 
+            # Crash overlay and reset handling
+            if self.crashed:
+                overlay = pygame.Surface((self.SCREEN_W, self.SCREEN_H), pygame.SRCALPHA)
+                overlay.fill((255, 0, 0, 100))
+                self.screen.blit(overlay, (0, 0))
+                text = self.font.render("CRASHED! Press R to reset.", True, (255, 255, 255))
+                self.screen.blit(text, (10, 10))
+                keys = pygame.key.get_pressed()
+                if keys[pygame.K_r]:
+                    self.reset()
+  
+            # HUD
+            hud = self.font.render(f"Speed: {self.speed:.2f} px/frame  Pos: {int(self.car_x)},{int(self.car_y)}", True, (0, 255, 255))
+            self.screen.blit(hud, (10, self.SCREEN_H - 30))
 
-        # Crash overlay and reset handling
-        if self.crashed:
-            overlay = pygame.Surface((self.SCREEN_W, self.SCREEN_H), pygame.SRCALPHA)
-            overlay.fill((255, 0, 0, 100))
-            self.screen.blit(overlay, (0, 0))
-            text = self.font.render("CRASHED! Press R to reset.", True, (255, 255, 255))
-            self.screen.blit(text, (10, 10))
-            keys = pygame.key.get_pressed()
-            if keys[pygame.K_r]:
-                self.reset()
-
-        # HUD
-        hud = self.font.render(f"Speed: {self.speed:.2f} px/frame  Pos: {int(self.car_x)},{int(self.car_y)}", True, (0, 255, 255))
-        self.screen.blit(hud, (10, self.SCREEN_H - 30))
-
-        pygame.display.flip()
+            pygame.display.flip()
+        
         self.step_count += 1
         next_state = self.getState()
 
         self.reward = self.speed - 1
+        if (self.speed==0):
+            self.crashed = True 
         if (self.crashed):
             reward = -10
         
