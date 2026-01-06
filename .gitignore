@@ -1,8 +1,5 @@
 .pkl
 .pth
 Tris_data_train_inspect.csv
-TrisGame/__pycache__/RLAgent.cpython-313.pyc
-TrisGame/__pycache__/tris.cpython-313.pyc
-TrisGamePy/__pycache__/dqn_agent.cpython-313.pyc
-TrisGamePy/__pycache__/tris.cpython-313.pyc
-SliksGamePy/__pycache__/sliks.cpython-313.pyc
+TrisGamePy/__pycache__
+SliksGamePy/__pycache__
