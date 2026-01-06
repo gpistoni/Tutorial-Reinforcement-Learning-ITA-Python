@@ -4,4 +4,5 @@ matplotlib
 scikit-learn
 pillow
 pygame
+gym
 
