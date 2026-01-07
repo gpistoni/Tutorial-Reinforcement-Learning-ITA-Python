@@ -57,6 +57,9 @@ class ReplayBuffer:
 
     def __len__(self):
         return len(self.buffer)
+    
+    def count(self) -> int:
+        return len(self.buffer)
 
 
 # --- DQN Agent ---
@@ -69,9 +72,9 @@ class DQNAgent:
         batch_size: int,
         buffer_capacity: int,
         eps_decay_steps: int,
+        lr: float,        
         device: torch.device = None,
-        gamma: float = 0.99,
-        lr: float = 1e-4,        
+        gamma: float = 0.99,        
         target_update: int = 1000,
         tau: float = 1.0,
         eps_start: float = 1.0,
@@ -90,7 +93,7 @@ class DQNAgent:
         self.gamma = gamma
         self.batch_size = batch_size
         self.target_update = target_update
-        self.tau = tau  # if <1, will do soft update
+        self.tau = tau          # if <1, will do soft update
         self.step_count = 0
 
         # Epsilon-greedy schedule
@@ -204,10 +207,11 @@ class DQNAgent:
             self.eps_start = data.get('eps_start', self.eps_start)
             self.eps_end = data.get('eps_end', self.eps_end)
             self.eps_decay_steps = data.get('eps_decay_steps', self.eps_decay_steps)
-            self.eps_start = max(self.eps_start, 0.2)
+            self.step_count = min(self.step_count, self.eps_decay_steps * 3 / 4)
             print(f"Agent load {file}");
         except Exception:
             pass
+
 
 #----------------------------------------------------------------------------------------------------------------------
 # --- Training loop ---

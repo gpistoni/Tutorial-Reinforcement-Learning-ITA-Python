@@ -3,7 +3,7 @@ from sliks import DrivingGame
 
 ###############################################################################################################################################
 if __name__ == "__main__":
-    import gym
+    #import gym
     import numpy as np
     from argparse import ArgumentParser
 

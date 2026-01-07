@@ -16,7 +16,7 @@ class DrivingGame:
         pygame.init()
         self.MAP_W, self.MAP_H = map_w, map_h
         self.SCREEN_W, self.SCREEN_H = screen_w, screen_h
-        self.MIN_SPEED = 1
+        self.MIN_SPEED = 0.2
         self.MAX_SPEED = max_speed
         self.ACC = acc
         self.BRAKE = brake
@@ -122,8 +122,8 @@ class DrivingGame:
 
             (self.car_x + math.cos(rad-1.2) * 40, self.car_y + math.sin(rad-1.2) * 40),
             (self.car_x + math.cos(rad-0.6) * 50, self.car_y + math.sin(rad-0.6) * 50),
-            (self.car_x + math.cos(rad-0.3) * 60, self.car_y + math.sin(rad-0.3) * 60),
-            (self.car_x + math.cos(rad+0.3) * 60, self.car_y + math.sin(rad+0.3) * 60),
+            (self.car_x + math.cos(rad-0.2) * 60, self.car_y + math.sin(rad-0.2) * 60),
+            (self.car_x + math.cos(rad+0.2) * 60, self.car_y + math.sin(rad+0.2) * 60),
             (self.car_x + math.cos(rad+0.6) * 50, self.car_y + math.sin(rad+0.6) * 50),
             (self.car_x + math.cos(rad+1.2) * 40, self.car_y + math.sin(rad+1.2) * 40),            
         ]

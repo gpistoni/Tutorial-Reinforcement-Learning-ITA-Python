@@ -5,3 +5,4 @@ TrisGamePy/__pycache__
 SliksGamePy/__pycache__
 SliksGamePy/__pycache__/dqn_agent.cpython-313.pyc
 SliksGamePy/__pycache__/sliks.cpython-313.pyc
+models/dqn_slicks.pth
