@@ -5,15 +5,18 @@ import numpy as np
 
 class DrivingGame:
     def __init__(self,
-                 map_w=1200, map_h=1200,
+                 fileMap,
+                 render_decmation = 1,
+                 map_w=1000, map_h=1000,
                  screen_w=1000, screen_h=1000,
-                 max_speed=4.0,
+                 max_speed=5.0,
                  acc=0.2, brake=0.35, steer_angle=4.0,
-                 fps=3000):
+                 fps=30):
         
         pygame.init()
         self.MAP_W, self.MAP_H = map_w, map_h
         self.SCREEN_W, self.SCREEN_H = screen_w, screen_h
+        self.MIN_SPEED = 1
         self.MAX_SPEED = max_speed
         self.ACC = acc
         self.BRAKE = brake
@@ -32,7 +35,7 @@ class DrivingGame:
 
         # Map surface
         self.map_surf = pygame.Surface((self.MAP_W, self.MAP_H))
-        self._build_map()
+        self._build_map(fileMap)
 
         # Car properties
         self.car_w, self.car_h = 24, 12
@@ -48,20 +51,22 @@ class DrivingGame:
         self.externalkey_LEFT = False
         self.externalkey_RIGHT = False
         self.running = False
+        self.render_decmation = render_decmation
+        self.tryMode = 0
         
 #----------------------------------------------------------------------------
-    def _build_map(self, filepath="SliksGamePy/track.png"):
+    def _build_map(self, fileMap):
         """
         Carica la mappa da filepath (BMP, PNG, ecc.). L'immagine viene ridimensionata a MAP_W x MAP_H
         se necessario e assegnata a self.map_surf.
         Pixel con colore uguale a self.OFFROAD_COLOR sono considerati fuori strada.
         """
         import os
-        if not os.path.exists(filepath):
-            raise FileNotFoundError(f"Map file not found: {filepath}")
+        if not os.path.exists(fileMap):
+            raise FileNotFoundError(f"Map file not found: {fileMap}")
 
         # Carica immagine come Surface
-        loaded = pygame.image.load(filepath)
+        loaded = pygame.image.load(fileMap)
 
         # Converti per velocità; mantiene canale alpha se presente
         if loaded.get_alpha() is not None:
@@ -110,20 +115,22 @@ class DrivingGame:
             (self.car_x + math.cos(rad-0.1) * 150, self.car_y + math.sin(rad-0.1) * 150),
             (self.car_x + math.cos(rad+0.1) * 150, self.car_y + math.sin(rad+0.1) * 150),
             
-            (self.car_x + math.cos(rad-0.6) * 70, self.car_y + math.sin(rad-0.6) * 70),
-            (self.car_x + math.cos(rad-0.2) * 100, self.car_y + math.sin(rad-0.2) * 100),
-            (self.car_x + math.cos(rad+0.2) * 100, self.car_y + math.sin(rad+0.2) * 100),
-            (self.car_x + math.cos(rad+0.6) * 70, self.car_y + math.sin(rad+0.6) * 70),
+            (self.car_x + math.cos(rad-1.0) * 70, self.car_y + math.sin(rad-1.0) * 70),
+            (self.car_x + math.cos(rad-0.5) * 100, self.car_y + math.sin(rad-0.5) * 100),
+            (self.car_x + math.cos(rad+0.5) * 100, self.car_y + math.sin(rad+0.5) * 100),
+            (self.car_x + math.cos(rad+1.0) * 70, self.car_y + math.sin(rad+1.0) * 70),
 
-            (self.car_x + math.cos(rad-1.0) * 40, self.car_y + math.sin(rad-1.0) * 40),
-            (self.car_x + math.cos(rad-0.6) * 40, self.car_y + math.sin(rad-0.6) * 40),
-            (self.car_x + math.cos(rad-0.2) * 50, self.car_y + math.sin(rad-0.2) * 50),
-            (self.car_x + math.cos(rad+0.2) * 50, self.car_y + math.sin(rad+0.2) * 50),
-            (self.car_x + math.cos(rad+0.6) * 40, self.car_y + math.sin(rad+0.6) * 40),
-            (self.car_x + math.cos(rad+1.0) * 40, self.car_y + math.sin(rad+1.0) * 40),            
+            (self.car_x + math.cos(rad-1.2) * 40, self.car_y + math.sin(rad-1.2) * 40),
+            (self.car_x + math.cos(rad-0.6) * 50, self.car_y + math.sin(rad-0.6) * 50),
+            (self.car_x + math.cos(rad-0.3) * 60, self.car_y + math.sin(rad-0.3) * 60),
+            (self.car_x + math.cos(rad+0.3) * 60, self.car_y + math.sin(rad+0.3) * 60),
+            (self.car_x + math.cos(rad+0.6) * 50, self.car_y + math.sin(rad+0.6) * 50),
+            (self.car_x + math.cos(rad+1.2) * 40, self.car_y + math.sin(rad+1.2) * 40),            
         ]
 
-        state.append(self.speed)
+        state.append(self.speed/10)
+        derive = self.car_angle - self.wheel_angle
+        state.append(derive/100)
 
         for px, py in self.state_points:
             if not self.is_on_road(px, py):
@@ -135,14 +142,15 @@ class DrivingGame:
     
 #-----------------------------------------------------------------------------------------------
     def getState_dim(self):
-        return 13 
+        return 14 
 
 #-----------------------------------------------------------------------------------------------
     def reset(self):
         # Reset car state
         self.car_x, self.car_y = float(self.start_pos[0]), float(self.start_pos[1])
         self.car_angle = 0.0
-        self.speed = 0.0
+        self.wheel_angle = 0.0
+        self.speed = 1.0
         self.crashed = False
         self.step_count = 0
         self.state_points = []
@@ -177,12 +185,11 @@ class DrivingGame:
             # Acceleration: up/dw arrow
             if keys[pygame.K_a] or keys[pygame.K_UP] or self.externalkey_UP:
                 self.speed += self.ACC
-                steer_angle /= (self.speed +1)
             elif keys[pygame.K_z] or keys[pygame.K_DOWN] or self.externalkey_DW:
                 self.speed -= self.BRAKE
-                steer_angle /= (self.speed +1)
             else:
                 self.speed -= 0.1
+            self.speed = max(self.speed,self.MIN_SPEED)
 
             # Steering: left/right arrows
             if keys[pygame.K_LEFT] or self.externalkey_LEFT:
@@ -190,6 +197,13 @@ class DrivingGame:
 
             if keys[pygame.K_RIGHT] or self.externalkey_RIGHT:
                 self.car_angle += steer_angle
+            
+            #Slip
+            derive = self.car_angle - self.wheel_angle
+            derive = min( derive, steer_angle )
+            derive = max( derive, -steer_angle )
+            if (self.speed>0):
+                self.wheel_angle += derive / (self.speed/2)
 
             #Reset keys
             self.externalkey_UP = False
@@ -201,14 +215,15 @@ class DrivingGame:
             self.speed = max(0.0, min(self.MAX_SPEED, self.speed))
    
             # Movement
-            rad = math.radians(self.car_angle)
-            dx = math.cos(rad) * self.speed
-            dy = math.sin(rad) * self.speed
+            radw = math.radians(self.wheel_angle)
+            dx = math.cos(radw) * self.speed
+            dy = math.sin(radw) * self.speed
             self.car_x += dx
             self.car_y += dy
             self.distance = math.sqrt(dx*dx+dy*dy)
 
             # Collision checks using a few sample points around the car
+            rad = math.radians(self.car_angle)
             check_points = [
                 (self.car_x, self.car_y),
                 (self.car_x + math.cos(rad) * (self.car_w/2), self.car_y - math.sin(rad) * (self.car_w/2)),
@@ -216,10 +231,12 @@ class DrivingGame:
                 (self.car_x + math.cos(rad + math.pi/2) * (self.car_h/2), self.car_y - math.sin(rad + math.pi/2) * (self.car_h/2)),
                 (self.car_x + math.cos(rad - math.pi/2) * (self.car_h/2), self.car_y - math.sin(rad - math.pi/2) * (self.car_h/2)),
             ]
+            out_of_road = 0
             for px, py in check_points:
                 if not self.is_on_road(px, py):
-                    self.crashed = True
-                    break
+                    out_of_road += 1                    
+            if (out_of_road >1):
+                self.crashed = True
 
         # Camera centering and clamping
         cam_x = int(self.car_x - self.SCREEN_W / 2)
@@ -227,7 +244,7 @@ class DrivingGame:
         cam_x = max(0, min(self.MAP_W - self.SCREEN_W, cam_x))
         cam_y = max(0, min(self.MAP_H - self.SCREEN_H, cam_y))
 
-        if(self.step_count%4==0):
+        if(self.step_count% self.render_decmation==0):
             # Draw map region
             self.screen.blit(self.map_surf, (0, 0), area=pygame.Rect(cam_x, cam_y, self.SCREEN_W, self.SCREEN_H))
 
@@ -264,9 +281,10 @@ class DrivingGame:
                 keys = pygame.key.get_pressed()
                 if keys[pygame.K_r]:
                     self.reset()
+                    self.tryMode=1
   
             # HUD
-            hud = self.font.render(f"Speed: {self.speed:.2f} px/frame  Pos: {int(self.car_x)},{int(self.car_y)}", True, (0, 255, 255))
+            hud = self.font.render(f"Speed: {self.speed:.2f} px/frame  Pos: {int(self.car_x)},{int(self.car_y)} Angle: {int(self.car_x)}", True, (0, 255, 255))
             self.screen.blit(hud, (10, self.SCREEN_H - 30))
 
             pygame.display.flip()
@@ -275,8 +293,7 @@ class DrivingGame:
         next_state = self.getState()
 
         self.reward = self.speed - 1
-        if (self.speed==0):
-            self.crashed = True 
+
         if (self.crashed):
             reward = -10
         
@@ -309,7 +326,7 @@ class DrivingGame:
 #-----------------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    game = DrivingGame()
+    game = DrivingGame( fileMap="SliksGamePy/track_0.png" )
     
     game.init_run()
     action = 0

@@ -8,7 +8,7 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
 
     # --- Crea ambiente ---
-    game = DrivingGame()
+    game = DrivingGame(fileMap="SliksGamePy/track_0.png", render_decmation=8, fps=100 )
 
     """
     # fallback: env mock con obs dim 16 e 4 azioni per testing rapido
@@ -32,7 +32,7 @@ if __name__ == "__main__":
         input_dim = game.getState_dim(),
         output_dim = game.getAction_dim(),
         lr=1e-3,
-        batch_size=64,
+        batch_size=128,
         buffer_capacity=50000,
         target_update=1000,
         eps_decay_steps=50000,
@@ -46,10 +46,8 @@ if __name__ == "__main__":
         game,
         num_episodes = 1000,
         max_steps_per_episode = 2000,
-        render = False,
-        reward_scale = 1.0,
-        log_every = 1,        
-        save_path="models/dqn_slicks.pth",
+        reward_scale = 1.0,      
+        model_path="models/dqn_slicks.pth",
     )
 
     # Salva modello finale

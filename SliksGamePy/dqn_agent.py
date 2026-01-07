@@ -21,7 +21,7 @@ import torch.optim as optim
 
 # --- Q-Network ---
 class QNetwork(nn.Module):
-    def __init__(self, input_dim: int = 16, output_dim: int = 4, hidden_sizes: List[int] = [128, 128]):
+    def __init__(self, input_dim: int , output_dim: int , hidden_sizes: List[int]):
         super(QNetwork, self).__init__()
         layers = []
         last = input_dim
@@ -31,6 +31,10 @@ class QNetwork(nn.Module):
             last = h
         layers.append(nn.Linear(last, output_dim))
         self.model = nn.Sequential(*layers)
+    
+        for m in self.model:
+            if isinstance(m, nn.Linear):
+                    nn.init.normal_(m.weight, mean=0.0, std=0.01)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
@@ -41,7 +45,7 @@ Transition = namedtuple('Transition', ('state', 'action', 'reward', 'next_state'
 
 
 class ReplayBuffer:
-    def __init__(self, capacity: int = 100000):
+    def __init__(self, capacity: int):
         self.capacity = capacity
         self.buffer: Deque[Transition] = deque(maxlen=capacity)
 
@@ -61,18 +65,19 @@ class DQNAgent:
         self,
         input_dim: int,
         output_dim: int,
+        hidden_sizes: List[int],
+        batch_size: int,
+        buffer_capacity: int,
+        eps_decay_steps: int,
         device: torch.device = None,
         gamma: float = 0.99,
-        lr: float = 1e-4,
-        batch_size: int = 128,
-        buffer_capacity: int = 100000,
+        lr: float = 1e-4,        
         target_update: int = 1000,
         tau: float = 1.0,
         eps_start: float = 1.0,
-        eps_end: float = 0.01,
-        eps_decay_steps: int = 100000,
-        hidden_sizes: List[int] = [128, 128],
+        eps_end: float = 0.01        
     ):
+        
         self.device = device or (torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'))
         self.policy_net = QNetwork(input_dim, output_dim, hidden_sizes).to(self.device)
         self.target_net = QNetwork(input_dim, output_dim, hidden_sizes).to(self.device)
@@ -199,6 +204,7 @@ class DQNAgent:
             self.eps_start = data.get('eps_start', self.eps_start)
             self.eps_end = data.get('eps_end', self.eps_end)
             self.eps_decay_steps = data.get('eps_decay_steps', self.eps_decay_steps)
+            self.eps_start = max(self.eps_start, 0.2)
             print(f"Agent load {file}");
         except Exception:
             pass
@@ -210,26 +216,19 @@ def train_dqn(
     game,
     num_episodes: int,
     max_steps_per_episode: int,
-    render: bool = False,
     reward_scale: float = 1.0,
-    log_every: int = 10,
-    save_path: str = None,
-):
+    model_path: str = None):
     """
     Train loop generico. reward_scale consente di normalizzare ricompense eventualmente grandi.
     Assume reward in [0, 10000] come indicato; si può ridurre con reward_scale=10000.0 per stabilità.
     """
-    agent.load(save_path)
+    agent.load(model_path)
     
-    rewards_history = []
-
     for ep in range(1, num_episodes + 1):
         game.reset()
         state = game.getState()
         ep_reward = 0.0
         for t in range(max_steps_per_episode):
-            if render:
-                game.render()
             action = agent.select_action(state, eval_mode=False)
             game.setAction(action)
             next_state, reward, done, info = game.step()
@@ -241,34 +240,34 @@ def train_dqn(
             ep_reward += float(reward)
             if done:
                 break
-        rewards_history.append(ep_reward)
+        print(f"Episode {ep}/{num_episodes} t: {t} avg_reward: {ep_reward:.2f}  eps: {agent.epsilon():.3f}  buffer: {agent.replay.count()}")
 
-        if ep % log_every == 0:
-            avg = sum(rewards_history[-log_every:]) / len(rewards_history[-log_every:])
-            print(f"Episode {ep}/{num_episodes} t: {t} avg_reward(last {log_every}): {avg:.2f}  eps: {agent.epsilon():.3f}")
+        if model_path and ep % 25 == 0:
+            print(f"Agent save {model_path}");
+            agent.save(model_path)
 
-        if save_path and ep % (log_every * 10) == 0:
-            print(f"Agent save");
-            agent.save(save_path)
-
-    return rewards_history
 
 #----------------------------------------------------------------------------------------------------------------------
 # --- Testing loop ---
-def test_dqn(agent: DQNAgent, game, num_episodes: int = 10, max_steps_per_episode: int = 1000, render: bool = False):
+def test_dqn(agent: DQNAgent, game, 
+             num_episodes: int = 10,
+             max_steps_per_episode: int = 1000, 
+             model_path: str = None):
     """
     Valuta l'agente in modalità greedy (no epsilon exploration).
     Restituisce lista delle ricompense total per episodio.
     """
+    agent.load(model_path)
+
     results = []
     for ep in range(num_episodes):
         state = game.reset()
+        state = game.getState()
         ep_reward = 0.0
         for t in range(max_steps_per_episode):
-            if render:
-                game.render()
             action = agent.select_action(state, eval_mode=True)
-            next_state, reward, done, info = game.step(action)
+            game.setAction(action)
+            next_state, reward, done, info = game.step()
             ep_reward += float(reward)
             state = next_state
             if done:
