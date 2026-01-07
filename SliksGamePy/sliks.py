@@ -115,17 +115,17 @@ class DrivingGame:
             (self.car_x + math.cos(rad-0.1) * 150, self.car_y + math.sin(rad-0.1) * 150),
             (self.car_x + math.cos(rad+0.1) * 150, self.car_y + math.sin(rad+0.1) * 150),
             
-            (self.car_x + math.cos(rad-1.0) * 70, self.car_y + math.sin(rad-1.0) * 70),
+            (self.car_x + math.cos(rad-1.0) * 80, self.car_y + math.sin(rad-1.0) * 80),
             (self.car_x + math.cos(rad-0.5) * 100, self.car_y + math.sin(rad-0.5) * 100),
             (self.car_x + math.cos(rad+0.5) * 100, self.car_y + math.sin(rad+0.5) * 100),
-            (self.car_x + math.cos(rad+1.0) * 70, self.car_y + math.sin(rad+1.0) * 70),
+            (self.car_x + math.cos(rad+1.0) * 80, self.car_y + math.sin(rad+1.0) * 80),
 
-            (self.car_x + math.cos(rad-1.2) * 40, self.car_y + math.sin(rad-1.2) * 40),
-            (self.car_x + math.cos(rad-0.6) * 50, self.car_y + math.sin(rad-0.6) * 50),
+            (self.car_x + math.cos(rad-1.2) * 60, self.car_y + math.sin(rad-1.2) * 60),
+            (self.car_x + math.cos(rad-0.6) * 60, self.car_y + math.sin(rad-0.6) * 60),
             (self.car_x + math.cos(rad-0.2) * 60, self.car_y + math.sin(rad-0.2) * 60),
             (self.car_x + math.cos(rad+0.2) * 60, self.car_y + math.sin(rad+0.2) * 60),
-            (self.car_x + math.cos(rad+0.6) * 50, self.car_y + math.sin(rad+0.6) * 50),
-            (self.car_x + math.cos(rad+1.2) * 40, self.car_y + math.sin(rad+1.2) * 40),            
+            (self.car_x + math.cos(rad+0.6) * 60, self.car_y + math.sin(rad+0.6) * 60),
+            (self.car_x + math.cos(rad+1.2) * 60, self.car_y + math.sin(rad+1.2) * 60),            
         ]
 
         state.append(self.speed/10)

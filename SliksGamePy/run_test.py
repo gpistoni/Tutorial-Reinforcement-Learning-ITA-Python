@@ -8,7 +8,7 @@ from sliks import DrivingGame
 if __name__ == '__main__':
 
     # --- Crea ambiente ---
-    game = DrivingGame(fileMap="SliksGamePy/track_0.png", render_decmation=1, fps=30 )
+    game = DrivingGame(fileMap="SliksGamePy/track_0.png", render_decmation=1, fps=30, max_speed=4.0 )
 
     # --- Crea agente ---
     agent = DQNAgent(

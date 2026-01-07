@@ -3,12 +3,11 @@ from sliks import DrivingGame
 
 ###############################################################################################################################################
 if __name__ == "__main__":
-    #import gym
     import numpy as np
     from argparse import ArgumentParser
 
     # --- Crea ambiente ---
-    game = DrivingGame(fileMap="SliksGamePy/track.png", render_decmation=10, fps=1000 )
+    game = DrivingGame(fileMap="SliksGamePy/track.png", render_decmation=5, fps=1000, max_speed=5.0 )
 
     # --- Crea agente ---
     agent = DQNAgent(
