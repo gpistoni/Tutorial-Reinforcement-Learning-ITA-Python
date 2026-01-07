@@ -129,8 +129,7 @@ class DrivingGame:
         ]
 
         state.append(self.speed/10)
-        derive = self.car_angle - self.wheel_angle
-        state.append(derive/100)
+        state.append(self.derive/100)
 
         for px, py in self.state_points:
             if not self.is_on_road(px, py):
@@ -150,11 +149,13 @@ class DrivingGame:
         self.car_x, self.car_y = float(self.start_pos[0]), float(self.start_pos[1])
         self.car_angle = 0.0
         self.wheel_angle = 0.0
-        self.speed = 1.0
+        self.speed = 0.0
+        self.derive = 0.0
         self.crashed = False
         self.step_count = 0
         self.state_points = []
         self.reward = 0
+        self.distance = 0 
 
 
 #-----------------------------------------------------------------------------------------------
@@ -167,6 +168,10 @@ class DrivingGame:
         if ix < 0 or iy < 0 or ix >= self.MAP_W or iy >= self.MAP_H:
             return False
         return self.map_surf.get_at((ix, iy))[:3] != self.OFFROAD_COLOR
+
+#-----------------------------------------------------------------------------------------------
+    def rescale_to_minus1_1(self, val: float, val_min: float, val_max: float) -> float:
+        return ((val - val_min) / (val_max - val_min)) * 2.0 - 1.0
 
 #-----------------------------------------------------------------------------------------------
     def step(self):
@@ -199,8 +204,8 @@ class DrivingGame:
                 self.car_angle += steer_angle
             
             #Slip
-            derive = self.car_angle - self.wheel_angle
-            derive = min( derive, steer_angle )
+            self.derive = self.car_angle - self.wheel_angle
+            derive = min( self.derive, steer_angle )
             derive = max( derive, -steer_angle )
             if (self.speed>0):
                 self.wheel_angle += derive / (self.speed/2)
@@ -220,7 +225,7 @@ class DrivingGame:
             dy = math.sin(radw) * self.speed
             self.car_x += dx
             self.car_y += dy
-            self.distance = math.sqrt(dx*dx+dy*dy)
+            self.distance += math.sqrt(dx*dx+dy*dy)
 
             # Collision checks using a few sample points around the car
             rad = math.radians(self.car_angle)
@@ -284,7 +289,7 @@ class DrivingGame:
                     self.tryMode=1
   
             # HUD
-            hud = self.font.render(f"Speed: {self.speed:.2f} px/frame  Pos: {int(self.car_x)},{int(self.car_y)} Angle: {int(self.car_x)}", True, (0, 255, 255))
+            hud = self.font.render(f"Speed: {self.speed:.2f} px/frame  Pos: {int(self.car_x)},{int(self.car_y)} Dist: {int(self.distance)}", True, (0, 255, 255))
             self.screen.blit(hud, (10, self.SCREEN_H - 30))
 
             pygame.display.flip()
@@ -292,14 +297,16 @@ class DrivingGame:
         self.step_count += 1
         next_state = self.getState()
 
-        self.reward = self.speed - 1
-
+        #Reward speed - derive 50% distance
+        self.reward = 0.5 * self.rescale_to_minus1_1(self.speed, 0, self.MAX_SPEED)
+        self.reward -= abs(self.derive) / 200               #200 influisce sulla % di impatto reward
+        self.reward += abs(self.distance) / 15000
         if (self.crashed):
-            reward = -10
+            self.reward = -1
         
         done = self.crashed
-        info =  self.reward
-        return next_state,  self.reward, done, info
+        info =  self.distance
+        return next_state, self.reward, done, info
 
 #-----------------------------------------------------------------------------------------------
     def run(self):

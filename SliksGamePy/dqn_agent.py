@@ -72,11 +72,11 @@ class DQNAgent:
         batch_size: int,
         buffer_capacity: int,
         eps_decay_steps: int,
-        lr: float,        
+        lr: float,  
+        tau: float,      
         device: torch.device = None,
         gamma: float = 0.99,        
         target_update: int = 1000,
-        tau: float = 1.0,
         eps_start: float = 1.0,
         eps_end: float = 0.01        
     ):
@@ -93,7 +93,7 @@ class DQNAgent:
         self.gamma = gamma
         self.batch_size = batch_size
         self.target_update = target_update
-        self.tau = tau          # if <1, will do soft update
+        self.tau = tau                                      # if <1, will do soft update
         self.step_count = 0
 
         # Epsilon-greedy schedule
@@ -113,9 +113,9 @@ class DQNAgent:
         if eval_mode or random.random() > eps:
             with torch.no_grad():
                 qvals = self.policy_net(state_t)
-                return int(qvals.argmax(dim=1).item())
+                return int(qvals.argmax(dim=1).item()), qvals.max()
         else:
-            return random.randrange(self.output_dim)
+            return random.randrange(self.output_dim), 0
 #----------------------------------------------------------------------------------------------------------------------
     def epsilon(self) -> float:
         frac = min(1.0, self.step_count / self.eps_decay_steps)
@@ -207,7 +207,6 @@ class DQNAgent:
             self.eps_start = data.get('eps_start', self.eps_start)
             self.eps_end = data.get('eps_end', self.eps_end)
             self.eps_decay_steps = data.get('eps_decay_steps', self.eps_decay_steps)
-            self.step_count = min(self.step_count, self.eps_decay_steps * 3 / 4)
             print(f"Agent load {file}");
         except Exception:
             pass
@@ -220,11 +219,9 @@ def train_dqn(
     game,
     num_episodes: int,
     max_steps_per_episode: int,
-    reward_scale: float = 1.0,
     model_path: str = None):
     """
-    Train loop generico. reward_scale consente di normalizzare ricompense eventualmente grandi.
-    Assume reward in [0, 10000] come indicato; si può ridurre con reward_scale=10000.0 per stabilità.
+    Train loop generico.
     """
     agent.load(model_path)
     
@@ -233,18 +230,18 @@ def train_dqn(
         state = game.getState()
         ep_reward = 0.0
         for t in range(max_steps_per_episode):
-            action = agent.select_action(state, eval_mode=False)
+            action, actionQ = agent.select_action(state, eval_mode=False)
             game.setAction(action)
             next_state, reward, done, info = game.step()
             # normalize reward optionally
-            r = float(reward) / reward_scale
+            r = float(reward)
             agent.store_transition(state, action, r, next_state, done)
             loss = agent.optimize()
             state = next_state
             ep_reward += float(reward)
             if done:
                 break
-        print(f"Episode {ep}/{num_episodes} t: {t} avg_reward: {ep_reward:.2f}  eps: {agent.epsilon():.3f}  buffer: {agent.replay.count()}")
+        print(f"Episode {ep:4}/{num_episodes} t: {t:6} avg_reward: {ep_reward:7.2f}  dist:{info:7.1f} eps: {agent.epsilon():7.3f}  buffer: {agent.replay.count()}")
 
         if model_path and ep % 25 == 0:
             print(f"Agent save {model_path}");
@@ -269,7 +266,7 @@ def test_dqn(agent: DQNAgent, game,
         state = game.getState()
         ep_reward = 0.0
         for t in range(max_steps_per_episode):
-            action = agent.select_action(state, eval_mode=True)
+            action, actionQ = agent.select_action(state, eval_mode=True)
             game.setAction(action)
             next_state, reward, done, info = game.step()
             ep_reward += float(reward)

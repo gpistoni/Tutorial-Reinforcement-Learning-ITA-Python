@@ -8,30 +8,14 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
 
     # --- Crea ambiente ---
-    game = DrivingGame(fileMap="SliksGamePy/track_0.png", render_decmation=8, fps=100 )
-
-    """
-    # fallback: env mock con obs dim 16 e 4 azioni per testing rapido
-    class DummyEnv:
-        def __init__(self):
-            self.observation_space = type("S", (), {"shape": (16,)})
-            self.action_space = type("A", (), {"n": 4})
-        def reset(self):
-            return np.zeros(16, dtype=np.float32)
-        def step(self, action):
-            next_s = np.random.randn(16).astype(np.float32)
-            reward = float(np.random.rand() * 10000.0)  # reward in [0,10000)
-            done = np.random.rand() < 0.01
-            return next_s, reward, done, {}
-        def render(self): pass
-    game = DummyEnv()
-    """
+    game = DrivingGame(fileMap="SliksGamePy/track.png", render_decmation=10, fps=1000 )
 
     # --- Crea agente ---
     agent = DQNAgent(
         input_dim = game.getState_dim(),
         output_dim = game.getAction_dim(),
-        lr=1e-3,
+        lr=1e-4,
+        tau=1e-2,
         batch_size=128,
         buffer_capacity=50000,
         target_update=1000,
@@ -45,8 +29,7 @@ if __name__ == "__main__":
         agent,
         game,
         num_episodes = 1000,
-        max_steps_per_episode = 2000,
-        reward_scale = 1.0,      
+        max_steps_per_episode = 2000,    
         model_path="models/dqn_slicks.pth",
     )
 

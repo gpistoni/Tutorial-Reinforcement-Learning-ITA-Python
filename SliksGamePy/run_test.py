@@ -15,6 +15,7 @@ if __name__ == '__main__':
         input_dim = game.getState_dim(),
         output_dim = game.getAction_dim(),
         lr=1e-3,
+        tau=1e-1,
         batch_size=128,
         buffer_capacity=100000,
         target_update=1000,
