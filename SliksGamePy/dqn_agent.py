@@ -78,7 +78,7 @@ class DQNAgent:
         gamma: float = 0.99,        
         target_update: int = 1000,
         eps_start: float = 1.0,
-        eps_end: float = 0.01        
+        eps_end: float = 0.02        
     ):
         
         self.device = device or (torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'))
@@ -243,6 +243,9 @@ def train_dqn(
                 break
         print(f"Episode {ep:4}/{num_episodes} t: {t:6} avg_reward: {ep_reward:7.2f}  dist:{info:7.1f} eps: {agent.epsilon():7.3f}  buffer: {agent.replay.count()}")
 
+        #if ( t > max_steps_per_episode-10):
+        #    game.max_speed += 0.05
+
         if model_path and ep % 25 == 0:
             print(f"Agent save {model_path}");
             agent.save(model_path)
@@ -251,8 +254,8 @@ def train_dqn(
 #----------------------------------------------------------------------------------------------------------------------
 # --- Testing loop ---
 def test_dqn(agent: DQNAgent, game, 
-             num_episodes: int = 10,
-             max_steps_per_episode: int = 1000, 
+             num_episodes: int,
+             max_steps_per_episode: int, 
              model_path: str = None):
     """
     Valuta l'agente in modalità greedy (no epsilon exploration).

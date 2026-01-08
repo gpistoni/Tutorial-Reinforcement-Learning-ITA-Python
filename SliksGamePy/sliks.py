@@ -6,18 +6,16 @@ import numpy as np
 class DrivingGame:
     def __init__(self,
                  fileMap,
+                 max_speed,
                  render_decmation = 1,
-                 map_w=1000, map_h=1000,
                  screen_w=1000, screen_h=1000,
-                 max_speed=5.0,
                  acc=0.2, brake=0.35, steer_angle=4.0,
                  fps=30):
         
         pygame.init()
-        self.MAP_W, self.MAP_H = map_w, map_h
         self.SCREEN_W, self.SCREEN_H = screen_w, screen_h
         self.MIN_SPEED = 0.2
-        self.MAX_SPEED = max_speed
+        self.max_speed = max_speed
         self.ACC = acc
         self.BRAKE = brake
         self.STEER_ANGLE = steer_angle
@@ -32,9 +30,9 @@ class DrivingGame:
         pygame.display.set_caption("Top-down Driving - Class")
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont(None, 24)
+        self.lap_time = pygame.time.get_ticks()
 
         # Map surface
-        self.map_surf = pygame.Surface((self.MAP_W, self.MAP_H))
         self._build_map(fileMap)
 
         # Car properties
@@ -57,8 +55,7 @@ class DrivingGame:
 #----------------------------------------------------------------------------
     def _build_map(self, fileMap):
         """
-        Carica la mappa da filepath (BMP, PNG, ecc.). L'immagine viene ridimensionata a MAP_W x MAP_H
-        se necessario e assegnata a self.map_surf.
+        Carica la mappa da filepath (BMP, PNG, ecc.). 
         Pixel con colore uguale a self.OFFROAD_COLOR sono considerati fuori strada.
         """
         import os
@@ -75,8 +72,8 @@ class DrivingGame:
             loaded = loaded.convert()
 
         # Ridimensiona se la dimensione non corrisponde
-        if loaded.get_width() != self.MAP_W or loaded.get_height() != self.MAP_H:
-            loaded = pygame.transform.smoothscale(loaded, (self.MAP_W, self.MAP_H))
+        self.MAP_W = loaded.get_width()
+        self.MAP_H = loaded.get_height()            
 
         # Assegna alla mappa
         self.map_surf = pygame.Surface((self.MAP_W, self.MAP_H))
@@ -110,38 +107,34 @@ class DrivingGame:
     def getState(self) -> np.ndarray:
         state = []   
         rad = math.radians(self.car_angle)
-        # Collision checks using a few sample points around the car
-        self.state_points = [
-            (self.car_x + math.cos(rad-0.1) * 150, self.car_y + math.sin(rad-0.1) * 150),
-            (self.car_x + math.cos(rad+0.1) * 150, self.car_y + math.sin(rad+0.1) * 150),
-            
-            (self.car_x + math.cos(rad-1.0) * 80, self.car_y + math.sin(rad-1.0) * 80),
-            (self.car_x + math.cos(rad-0.5) * 100, self.car_y + math.sin(rad-0.5) * 100),
-            (self.car_x + math.cos(rad+0.5) * 100, self.car_y + math.sin(rad+0.5) * 100),
-            (self.car_x + math.cos(rad+1.0) * 80, self.car_y + math.sin(rad+1.0) * 80),
+        # Collision checks using a few sample points around the car        
+        self.state_points = []
 
-            (self.car_x + math.cos(rad-1.2) * 60, self.car_y + math.sin(rad-1.2) * 60),
-            (self.car_x + math.cos(rad-0.6) * 60, self.car_y + math.sin(rad-0.6) * 60),
-            (self.car_x + math.cos(rad-0.2) * 60, self.car_y + math.sin(rad-0.2) * 60),
-            (self.car_x + math.cos(rad+0.2) * 60, self.car_y + math.sin(rad+0.2) * 60),
-            (self.car_x + math.cos(rad+0.6) * 60, self.car_y + math.sin(rad+0.6) * 60),
-            (self.car_x + math.cos(rad+1.2) * 60, self.car_y + math.sin(rad+1.2) * 60),            
-        ]
+########################################
+        self.dir_points = []
+        for an in range(10):
+            self.dir_points.append(1)
+            realan = rad + 2*(an-5)
+            rcos = math.cos(realan)
+            rsin = math.sin(realan)
+            for d in range(100):
+                ptx, pty = (self.car_x + rcos * d, self.car_y + rsin * d)
+                if not self.is_on_road(ptx, pty):
+                    self.dir_points[an] = d/100
+                    break
 
+########################################
         state.append(self.speed/10)
         state.append(self.derive/100)
 
-        for px, py in self.state_points:
-            if not self.is_on_road(px, py):
-                state.append(1)
-            else:
-                state.append(-1)       
+        for e in self.dir_points:
+            state.append(e)
 
         return state        
     
 #-----------------------------------------------------------------------------------------------
     def getState_dim(self):
-        return 14 
+        return 12
 
 #-----------------------------------------------------------------------------------------------
     def reset(self):
@@ -156,7 +149,9 @@ class DrivingGame:
         self.state_points = []
         self.reward = 0
         self.distance = 0 
-
+        self.dist_ckeckpoint = []
+        self.dist_ckeckpoint.append((self.car_x, self.car_y))
+        self.lap_time = pygame.time.get_ticks()
 
 #-----------------------------------------------------------------------------------------------
     def rotate_center(self, image, angle):
@@ -205,10 +200,14 @@ class DrivingGame:
             
             #Slip
             self.derive = self.car_angle - self.wheel_angle
-            derive = min( self.derive, steer_angle )
-            derive = max( derive, -steer_angle )
-            if (self.speed>0):
-                self.wheel_angle += derive / (self.speed/2)
+            self.derive = min( self.derive, 90 )
+            self.derive = max( self.derive, -90 )
+
+            Act_derive = min( self.derive, steer_angle )
+            Act_derive = max( Act_derive, -steer_angle )
+            if ( self.speed > 0 ):
+                self.wheel_angle += Act_derive / (self.speed/6)
+            self.speed -=  self.speed * abs( self.derive / 200.0)
 
             #Reset keys
             self.externalkey_UP = False
@@ -217,7 +216,7 @@ class DrivingGame:
             self.externalkey_RIGHT = False
 
             # Clamp speed
-            self.speed = max(0.0, min(self.MAX_SPEED, self.speed))
+            self.speed = max(0.0, min(self.max_speed, self.speed))
    
             # Movement
             radw = math.radians(self.wheel_angle)
@@ -226,6 +225,10 @@ class DrivingGame:
             self.car_x += dx
             self.car_y += dy
             self.distance += math.sqrt(dx*dx+dy*dy)
+
+            chkp_dist = min(math.dist((self.car_x, self.car_y), cp) for cp in self.dist_ckeckpoint[-10:]   )
+            if (chkp_dist > 100):
+                self.dist_ckeckpoint.append((self.car_x, self.car_y))
 
             # Collision checks using a few sample points around the car
             rad = math.radians(self.car_angle)
@@ -243,6 +246,15 @@ class DrivingGame:
             if (out_of_road >1):
                 self.crashed = True
 
+            #Lap Check
+            d = math.dist((self.car_x, self.car_y), self.start_pos)
+            lt = pygame.time.get_ticks() - self.lap_time
+            if d < 40 and lt > 2000:
+                #Lap
+                print(f"LapTime s: {lt/1000.0}")
+                self.lap_time = pygame.time.get_ticks()
+                                
+
         # Camera centering and clamping
         cam_x = int(self.car_x - self.SCREEN_W / 2)
         cam_y = int(self.car_y - self.SCREEN_H / 2)
@@ -259,23 +271,30 @@ class DrivingGame:
             self.screen.blit(car_img, car_rect)        
 
             #  STATE_PT Converti alle coord relative alla camera e disegna solo 3 punti (es. i primi 3)
-            for px, py in self.state_points:
+            if False:
+                for px, py in self.state_points:
+                    screen_x = int(px - cam_x)
+                    screen_y = int(py - cam_y)
+                    if self.is_on_road(px, py):
+                        col = (128, 128, 128)
+                    else:
+                        col = (255, 128, 128)
+                    pygame.draw.circle(self.screen, col, (screen_x, screen_y), 4)  # rosso, raggio 4
+                    
+                    # opzionale: disegna etichette dei punti
+                    font = pygame.font.get_default_font()
+                    f = pygame.font.Font(font, 14)
+                    for i, (px, py) in enumerate(self.state_points):
+                        sx, sy = int(px - cam_x), int(py - cam_y)
+                        lbl = f.render(str(i), True, (128, 128, 128) )
+                        self.screen.blit(lbl, (sx+6, sy-6))
+
+            #Chechpoints
+            for px, py in self.dist_ckeckpoint[-10:]:
                 screen_x = int(px - cam_x)
                 screen_y = int(py - cam_y)
-                if self.is_on_road(px, py):
-                    col = (128, 128, 128)
-                else:
-                    col = (255, 128, 128)
-                pygame.draw.circle(self.screen, col, (screen_x, screen_y), 4)  # rosso, raggio 4
-
-            # opzionale: disegna etichette dei punti
-            font = pygame.font.get_default_font()
-            f = pygame.font.Font(font, 14)
-            for i, (px, py) in enumerate(self.state_points):
-                sx, sy = int(px - cam_x), int(py - cam_y)
-                lbl = f.render(str(i), True, (128, 128, 128) )
-                self.screen.blit(lbl, (sx+6, sy-6))
-
+                pygame.draw.circle(self.screen,  self.OFFROAD_COLOR, (screen_x, screen_y), 12)
+     
             # Crash overlay and reset handling
             if self.crashed:
                 overlay = pygame.Surface((self.SCREEN_W, self.SCREEN_H), pygame.SRCALPHA)
@@ -289,20 +308,19 @@ class DrivingGame:
                     self.tryMode=1
   
             # HUD
-            hud = self.font.render(f"Speed: {self.speed:.2f} px/frame  Pos: {int(self.car_x)},{int(self.car_y)} Dist: {int(self.distance)}", True, (0, 255, 255))
+            hud = self.font.render(f"Speed: {self.speed:.2f} px/frame  Pos: {int(self.car_x)},{int(self.car_y)} Dist: {int(self.distance)} Chk:{self.dist_ckeckpoint.__len__()}", True, (128, 128, 255))
             self.screen.blit(hud, (10, self.SCREEN_H - 30))
-
             pygame.display.flip()
         
         self.step_count += 1
         next_state = self.getState()
 
         #Reward speed - derive 50% distance
-        self.reward = 0.5 * self.rescale_to_minus1_1(self.speed, 0, self.MAX_SPEED)
-        self.reward -= abs(self.derive) / 200               #200 influisce sulla % di impatto reward
-        self.reward += abs(self.distance) / 15000
+        self.reward = self.rescale_to_minus1_1(self.speed, 0, self.max_speed)
+        #self.reward -= abs(self.derive) / 100                   #200 influisce sulla % di impatto reward
+        self.reward += self.dist_ckeckpoint.__len__() / 200
         if (self.crashed):
-            self.reward = -1
+            self.reward = -10
         
         done = self.crashed
         info =  self.distance
@@ -333,7 +351,7 @@ class DrivingGame:
 #-----------------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    game = DrivingGame( fileMap="SliksGamePy/track_0.png" )
+    game = DrivingGame( fileMap="SliksGamePy/track_0.png", max_speed=5 )
     
     game.init_run()
     action = 0

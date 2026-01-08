@@ -7,7 +7,7 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
 
     # --- Crea ambiente ---
-    game = DrivingGame(fileMap="SliksGamePy/track.png", render_decmation=5, fps=1000, max_speed=5.0 )
+    game = DrivingGame(fileMap="SliksGamePy/track_1.png", render_decmation=10, fps=300, max_speed=2.0 )
 
     # --- Crea agente ---
     agent = DQNAgent(
@@ -28,7 +28,7 @@ if __name__ == "__main__":
         agent,
         game,
         num_episodes = 1000,
-        max_steps_per_episode = 2000,    
+        max_steps_per_episode = 5000,    
         model_path="models/dqn_slicks.pth",
     )
 
